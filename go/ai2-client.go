@@ -76,7 +76,7 @@ func NewAI2Client(username, password, clientId, secretKey, environment, configFi
 		// environment is validated in awss.NewAWSConfig
 		tEnvironment = environment
 	} else {
-		if errorInfo = config.GetConfigFile(configFileFQN, configPtr); errorInfo != nil {
+		if errorInfo = config.GetConfigFile(configFileFQN, configPtr); errorInfo.Error != nil {
 			return
 		}
 		tEnvironment = configPtr.Environment
