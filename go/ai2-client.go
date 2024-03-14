@@ -1,18 +1,12 @@
 // Package main
 /*
-General description of the purpose of the go file.
+This is a client for STY Holdings services
 
 RESTRICTIONS:
-    AWS functions:
-    * Program must have access to a .aws/credentials file in the default location.
-    * This will only access system parameters that start with '/sote' (ROOTPATH).
-    * {Enter other restrictions here for AWS
-
-    {Other catagories of restrictions}
-    * {List of restrictions for the catagory
+	None
 
 NOTES:
-    {Enter any additional notes that you believe will help the next developer.}
+    None
 
 COPYRIGHT:
 	Copyright 2022
