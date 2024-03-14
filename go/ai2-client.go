@@ -40,34 +40,58 @@ import (
 	pi "github.com/sty-holdings/sty-shared/v2024/programInfo"
 )
 
-func stripeRequest(username, password, clientId, secretKey, configFileFQN string) (errorInfo pi.ErrorInfo) {
+func NewAI2Client(username, password, clientId, secretKey, environment, configFileFQN string) (
+	awssPtr *awss.AWSSession,
+	errorInfo pi.ErrorInfo,
+) {
 
 	var (
-		configPtr *Ai2ClientConfig
+		configPtr    *Ai2ClientConfig
+		tEnvironment string
+		tPasswordPtr *string
+		tUsername    string
 	)
 
 	if configFileFQN == ctv.VAL_EMPTY {
-		if username == ctv.VAL_EMPTY {
-			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_USERNAME))
+		if clientId == ctv.VAL_EMPTY {
+			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_CLIENT_ID))
 			return
 		}
 		if password == ctv.VAL_EMPTY {
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_PASSWORD))
 			return
-		}
-		if clientId == ctv.VAL_EMPTY {
-			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_CLIENT_ID))
-			return
+		} else {
+			tPasswordPtr = &password
 		}
 		if secretKey == ctv.VAL_EMPTY {
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_SECRET_KEY))
 			return
 		}
+		if username == ctv.VAL_EMPTY {
+			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_USERNAME))
+			return
+		} else {
+			tUsername = username
+		}
+		// environment is validated in awss.NewAWSConfig
+		tEnvironment = environment
 	} else {
-		config.GetConfigFile(configFileFQN, configPtr)
+		if errorInfo = config.GetConfigFile(configFileFQN, configPtr); errorInfo != nil {
+			return
+		}
+		tEnvironment = configPtr.Environment
+		tPasswordPtr = &configPtr.Password
+		tUsername = configPtr.Username
 	}
 
-	awsHelper, errorInfo := awss.NewAWSSession()
+	if awssPtr, errorInfo = awss.NewAWSConfig(tEnvironment); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+		return
+	}
+	if _, errorInfo = awss.Login(ctv.AUTH_USER_SRP, tUsername, tPasswordPtr, awssPtr); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+		return
+	}
 
 	return
 	// Set up goes here

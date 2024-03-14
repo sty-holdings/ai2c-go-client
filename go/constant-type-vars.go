@@ -36,10 +36,11 @@ const (
 )
 
 type Ai2ClientConfig struct {
-	username  string `json:"username"`
-	password  string `json:"password"`
-	clientId  string `json:"client_id"`
-	secretKey string `json:"secret_key"`
+	ClientId    string `json:"client_id"`
+	Environment string `json:"environment"`
+	Password    string `json:"password"`
+	SecretKey   string `json:"secret_key"`
+	Username    string `json:"username"`
 }
 
 var (
