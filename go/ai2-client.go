@@ -30,7 +30,7 @@ import (
 
 	ctv "github.com/sty-holdings/constant-type-vars-go/v2024"
 	awss "github.com/sty-holdings/sty-shared/v2024/awsServices"
-	config "github.com/sty-holdings/sty-shared/v2024/configuration"
+	cfgs "github.com/sty-holdings/sty-shared/v2024/configuration"
 	pi "github.com/sty-holdings/sty-shared/v2024/programInfo"
 )
 
@@ -40,10 +40,14 @@ func NewAI2Client(username, password, clientId, secretKey, environment, configFi
 ) {
 
 	var (
-		configPtr    *Ai2ClientConfig
+		// config       Ai2ClientConfig
 		tEnvironment string
-		tPasswordPtr *string
+		tPassword    string
 		tUsername    string
+	)
+
+	var (
+		tConfigMap = make(map[string]interface{})
 	)
 
 	if configFileFQN == ctv.VAL_EMPTY {
@@ -55,7 +59,7 @@ func NewAI2Client(username, password, clientId, secretKey, environment, configFi
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_PASSWORD))
 			return
 		} else {
-			tPasswordPtr = &password
+			tPassword = password
 		}
 		if secretKey == ctv.VAL_EMPTY {
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_SECRET_KEY))
@@ -70,22 +74,26 @@ func NewAI2Client(username, password, clientId, secretKey, environment, configFi
 		// environment is validated in awss.NewAWSConfig
 		tEnvironment = environment
 	} else {
-		if errorInfo = config.GetConfigFile(configFileFQN, configPtr); errorInfo.Error != nil {
+		if tConfigMap, errorInfo = cfgs.GetConfigFile(configFileFQN); errorInfo.Error != nil {
 			return
 		}
-		tEnvironment = configPtr.Environment
-		tPasswordPtr = &configPtr.Password
-		tUsername = configPtr.Username
+		fmt.Println(tConfigMap)
+		tEnvironment = tConfigMap["environment"].(string)
+		tPassword = tConfigMap["password"].(string)
+		tConfigMap["password"] = ctv.TXT_PROTECTED // Clear the password from memory.
+		tUsername = tConfigMap["username"].(string)
 	}
 
 	if awssPtr, errorInfo = awss.NewAWSConfig(tEnvironment); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
-	if _, errorInfo = awss.Login(ctv.AUTH_USER_SRP, tUsername, tPasswordPtr, awssPtr); errorInfo.Error != nil {
+	if _, errorInfo = awss.Login(ctv.AUTH_USER_SRP, tUsername, &tPassword, awssPtr); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
+
+	tPassword = ctv.TXT_PROTECTED // Clear the password from memory.
 
 	return
 	// Set up goes here
