@@ -3,9 +3,10 @@ module nc-stripe
 go 1.21.5
 
 require (
+	github.com/aws/aws-sdk-go-v2/service/ssm v1.49.2
 	github.com/integrii/flaggy v1.5.2
-	github.com/sty-holdings/constant-type-vars-go/v2024 v2024.5.1
-	github.com/sty-holdings/sty-shared/v2024 v2024.6.8
+	github.com/sty-holdings/constant-type-vars-go/v2024 v2024.5.10
+	github.com/sty-holdings/sty-shared/v2024 v2024.6.25
 	golang.org/x/text v0.14.0
 )
 
@@ -29,7 +30,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.35.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.11.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.5 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssm v1.49.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.20.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.23.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.4 // indirect
@@ -43,6 +43,10 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.2.4 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/klauspost/compress v1.17.2 // indirect
+	github.com/nats-io/nats.go v1.33.1 // indirect
+	github.com/nats-io/nkeys v0.4.7 // indirect
+	github.com/nats-io/nuid v1.0.1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/net v0.22.0 // indirect

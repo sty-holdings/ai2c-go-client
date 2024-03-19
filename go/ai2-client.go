@@ -27,23 +27,31 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
+	awsSSM "github.com/aws/aws-sdk-go-v2/service/ssm"
 	ctv "github.com/sty-holdings/constant-type-vars-go/v2024"
 	awss "github.com/sty-holdings/sty-shared/v2024/awsServices"
 	cfgs "github.com/sty-holdings/sty-shared/v2024/configuration"
+	hv "github.com/sty-holdings/sty-shared/v2024/helpersValidators"
+	ns "github.com/sty-holdings/sty-shared/v2024/natsSerices"
 	pi "github.com/sty-holdings/sty-shared/v2024/programInfo"
 )
 
 func NewAI2Client(username, password, clientId, secretKey, environment, configFileFQN string) (
-	awssPtr *awss.AWSSession,
+	ai2ClientPtr Ai2Client,
 	errorInfo pi.ErrorInfo,
 ) {
 
 	var (
-		// config       Ai2ClientConfig
-		tEnvironment string
-		tPassword    string
-		tUsername    string
+		tClientId         string
+		tEnvironment      string
+		tParameterName    string
+		tParametersOutput awsSSM.GetParametersOutput
+		tParameterValue   string
+		tPassword         string
+		tSecretKey        string
+		tUsername         string
 	)
 
 	var (
@@ -54,6 +62,8 @@ func NewAI2Client(username, password, clientId, secretKey, environment, configFi
 		if clientId == ctv.VAL_EMPTY {
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_CLIENT_ID))
 			return
+		} else {
+			tClientId = clientId
 		}
 		if password == ctv.VAL_EMPTY {
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_PASSWORD))
@@ -64,6 +74,8 @@ func NewAI2Client(username, password, clientId, secretKey, environment, configFi
 		if secretKey == ctv.VAL_EMPTY {
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_SECRET_KEY))
 			return
+		} else {
+			tSecretKey = secretKey
 		}
 		if username == ctv.VAL_EMPTY {
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_USERNAME))
@@ -77,24 +89,120 @@ func NewAI2Client(username, password, clientId, secretKey, environment, configFi
 		if tConfigMap, errorInfo = cfgs.GetConfigFile(configFileFQN); errorInfo.Error != nil {
 			return
 		}
-		fmt.Println(tConfigMap)
-		tEnvironment = tConfigMap["environment"].(string)
-		tPassword = tConfigMap["password"].(string)
-		tConfigMap["password"] = ctv.TXT_PROTECTED // Clear the password from memory.
-		tUsername = tConfigMap["username"].(string)
+		tClientId = tConfigMap[ctv.FN_CLIENT_ID].(string)
+		tEnvironment = tConfigMap[ctv.FN_ENVIRONMENT].(string)
+		tPassword = tConfigMap[ctv.FN_PASSWORD].(string)
+		tConfigMap[ctv.FN_PASSWORD] = ctv.TXT_PROTECTED // Clear the password from memory.
+		tSecretKey = tConfigMap[ctv.FN_SECRET_KEY].(string)
+		tUsername = tConfigMap[ctv.FN_USERNAME].(string)
 	}
 
-	if awssPtr, errorInfo = awss.NewAWSConfig(tEnvironment); errorInfo.Error != nil {
-		pi.PrintErrorInfo(errorInfo)
-		return
-	}
-	if _, errorInfo = awss.Login(ctv.AUTH_USER_SRP, tUsername, &tPassword, awssPtr); errorInfo.Error != nil {
+	if errorInfo = validateConfiguration(tClientId, tEnvironment, tSecretKey, tUsername, &tPassword); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
 
-	tPassword = ctv.TXT_PROTECTED // Clear the password from memory.
+	if ai2ClientPtr.awssPtr, errorInfo = awss.NewAWSConfig(tEnvironment); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+		return
+	}
+	ai2ClientPtr.environment = tEnvironment
+
+	if errorInfo = awss.Login(ctv.AUTH_USER_SRP, tUsername, &tPassword, ai2ClientPtr.awssPtr); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+		return
+	}
+
+	ai2ClientPtr.secretKey = tSecretKey
+	tPassword = ctv.TXT_PROTECTED  // Clear the password from memory.
+	secretKey = ctv.TXT_PROTECTED  // Clear the secret key from memory.
+	tSecretKey = ctv.TXT_PROTECTED // Clear the secret key from memory.
+
+	if tParametersOutput, errorInfo = awss.GetParameters(
+		ai2ClientPtr.awssPtr,
+		ctv.GetParameterName(ctv.PARAMETER_NATS_TOKEN, PROGRAM_NAME, tEnvironment),
+		ctv.GetParameterName(ctv.PARAMETER_NATS_PORT, PROGRAM_NAME, tEnvironment),
+		ctv.GetParameterName(ctv.PARAMETER_NATS_URL, PROGRAM_NAME, tEnvironment),
+		ctv.GetParameterName(ctv.PARAMETER_TLS_CERT, PROGRAM_NAME, tEnvironment),
+		ctv.GetParameterName(ctv.PARAMETER_TLS_PRIVATE_KEY, PROGRAM_NAME, tEnvironment),
+		ctv.GetParameterName(ctv.PARAMETER_TLS_CA_BUNDLE, PROGRAM_NAME, tEnvironment),
+	); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+		return
+	}
+
+	for _, parameter := range tParametersOutput.Parameters {
+		tParameterName = *parameter.Name
+		tParameterValue = *parameter.Value
+		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_NATS_TOKEN, PROGRAM_NAME, tEnvironment) {
+			ai2ClientPtr.natsConfig.NATSToken = tParameterValue
+		}
+		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_NATS_PORT, PROGRAM_NAME, tEnvironment) {
+			ai2ClientPtr.natsConfig.NATSPort, _ = strconv.Atoi(tParameterValue)
+		}
+		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_NATS_URL, PROGRAM_NAME, tEnvironment) {
+			ai2ClientPtr.natsConfig.NATSURL = tParameterValue
+		}
+		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_TLS_CERT, PROGRAM_NAME, tEnvironment) {
+			ai2ClientPtr.natsConfig.NATSTLSInfo.TLSCert = tParameterValue
+		}
+		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_TLS_PRIVATE_KEY, PROGRAM_NAME, tEnvironment) {
+			ai2ClientPtr.natsConfig.NATSTLSInfo.TLSPrivateKey = tParameterValue
+		}
+		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_TLS_CA_BUNDLE, PROGRAM_NAME, tEnvironment) {
+			ai2ClientPtr.natsConfig.NATSTLSInfo.TLSCABundle = tParameterValue
+		}
+	}
+	// clientPtr.natsConfig.NATSPort = tParametersOutput.Parameters
+	fmt.Println(tParametersOutput)
+
+	if ai2ClientPtr.natsService.InstanceName, errorInfo = ns.BuildInstanceName(ns.METHOD_DASHES, awss.GetClientId(ai2ClientPtr.awssPtr)); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+		return
+	}
+	if ai2ClientPtr.natsService.ConnPtr, errorInfo = ns.GetConnectionWithToken(ai2ClientPtr.natsService.InstanceName, ai2ClientPtr.natsConfig); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+		return
+	}
 
 	return
-	// Set up goes here
+}
+
+// Private Function below here
+
+// validateConfiguration - checks the values in the configuration file are valid. ValidateConfiguration doesn't
+// test if the configuration file exists, readable, or parsable.
+//
+//	Customer Messages: None
+//	Errors: ErrEnvironmentInvalid, ErrRequiredArgumentMissing
+//	Verifications: None
+func validateConfiguration(
+	clientId, environment, secretKey, username string,
+	passwordPtr *string,
+) (
+	errorInfo pi.ErrorInfo,
+) {
+
+	if clientId == ctv.VAL_EMPTY {
+		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_CLIENT_ID))
+		return
+	}
+	if passwordPtr == nil {
+		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_PASSWORD))
+		return
+	}
+	if secretKey == ctv.VAL_EMPTY {
+		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_SECRET_KEY))
+		return
+	}
+	if username == ctv.VAL_EMPTY {
+		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_USERNAME))
+		return
+	}
+	if hv.IsEnvironmentValid(environment) == false {
+		errorInfo = pi.NewErrorInfo(pi.ErrEnvironmentInvalid, fmt.Sprintf("%v%v", ctv.TXT_EVIRONMENT, ctv.FN_ENVIRONMENT))
+		return
+	}
+
+	return
 }

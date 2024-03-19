@@ -28,7 +28,6 @@ import (
 
 	"github.com/integrii/flaggy"
 	ctv "github.com/sty-holdings/constant-type-vars-go/v2024"
-	sty_shared "github.com/sty-holdings/sty-shared/v2024/awsServices"
 	config "github.com/sty-holdings/sty-shared/v2024/configuration"
 	pi "github.com/sty-holdings/sty-shared/v2024/programInfo"
 	"golang.org/x/text/cases"
@@ -128,13 +127,13 @@ func run(username, password, clientId, secretKey, environment, configFileFQN str
 
 	var (
 		errorInfo pi.ErrorInfo
-		awssPtr   *sty_shared.AWSSession
+		clientPtr Ai2Client
 	)
 
-	if awssPtr, errorInfo = NewAI2Client(username, password, clientId, secretKey, environment, configFileFQN); errorInfo.Error != nil {
+	if clientPtr, errorInfo = NewAI2Client(username, password, clientId, secretKey, environment, configFileFQN); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		flaggy.ShowHelpAndExit("")
 	}
 
-	fmt.Println(awssPtr)
+	fmt.Println(clientPtr)
 }

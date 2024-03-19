@@ -31,18 +31,20 @@ COPYRIGHT:
 */
 package main
 
+import (
+	awss "github.com/sty-holdings/sty-shared/v2024/awsServices"
+	ns "github.com/sty-holdings/sty-shared/v2024/natsSerices"
+)
+
+//goland:noinspection ALL
 const (
-// Add Constants to the constants.go file
+	PROGRAM_NAME = "ai2"
 )
 
-type Ai2ClientConfig struct {
-	ClientId    string `json:"client_id"`
-	Environment string `json:"environment"`
-	Password    string `json:"password"`
-	SecretKey   string `json:"secret_key"`
-	Username    string `json:"username"`
+type Ai2Client struct {
+	awssPtr     *awss.AWSSession
+	environment string
+	natsService ns.NATSService
+	natsConfig  ns.NATSConfiguration
+	secretKey   string
 }
-
-var (
-// Add Variables here for the file (Remember, they are global)
-)
