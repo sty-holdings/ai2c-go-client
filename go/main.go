@@ -42,6 +42,7 @@ var (
 	environment    = "production" // this is the default. For development, use 'development'.
 	programName    = "AI2-client for go"
 	secretKey      string
+	tempDirectory  string
 	testingOn      bool
 	username       string
 	version        = "9999.9999.9999"
@@ -80,6 +81,9 @@ func init() {
 		&secretKey, "sk", "secretKey", "The AI2 Connect assigned secret key. This is encrypted using SSL and a new can be generated at https://production-nc-dashboard."+
 			"web.app/.",
 	)
+	flaggy.String(
+		&tempDirectory, "tmp", "tempDir", "The temporary directory where the Ai2 Client can read and write temporary files.",
+	)
 	flaggy.Bool(&testingOn, "t", "testingOn", "This puts the program into testing mode.")
 	flaggy.String(&username, "u", "username", "The username you selected when you signed up for AI2 connect services. This is encrypted using SSL and only exist in Cognito.")
 
@@ -110,7 +114,7 @@ func main() {
 			pi.PrintError(pi.ErrVersionInvalid, fmt.Sprintf("%v %v", ctv.TXT_SERVER_VERSION, version))
 			flaggy.ShowHelpAndExit("")
 		}
-		if username == ctv.VAL_EMPTY || password == ctv.VAL_EMPTY || clientId == ctv.VAL_EMPTY || secretKey == ctv.VAL_EMPTY {
+		if username == ctv.VAL_EMPTY || password == ctv.VAL_EMPTY || clientId == ctv.VAL_EMPTY || secretKey == ctv.VAL_EMPTY || tempDirectory == ctv.VAL_EMPTY {
 			// Has the config file location and name been provided, if not, return help.
 			if configFileFQN == "" || configFileFQN == "-t" {
 				flaggy.ShowHelpAndExit("")
@@ -118,19 +122,19 @@ func main() {
 		}
 	}
 
-	run(username, password, clientId, secretKey, environment, configFileFQN)
+	run(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN)
 
 	os.Exit(0)
 }
 
-func run(username, password, clientId, secretKey, environment, configFileFQN string) {
+func run(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) {
 
 	var (
 		errorInfo pi.ErrorInfo
 		clientPtr Ai2Client
 	)
 
-	if clientPtr, errorInfo = NewAI2Client(username, password, clientId, secretKey, environment, configFileFQN); errorInfo.Error != nil {
+	if clientPtr, errorInfo = NewAI2Client(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		flaggy.ShowHelpAndExit("")
 	}

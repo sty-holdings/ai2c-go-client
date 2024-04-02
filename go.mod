@@ -5,8 +5,8 @@ go 1.21.5
 require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.49.2
 	github.com/integrii/flaggy v1.5.2
-	github.com/sty-holdings/constant-type-vars-go/v2024 v2024.5.10
-	github.com/sty-holdings/sty-shared/v2024 v2024.6.25
+	github.com/sty-holdings/constant-type-vars-go/v2024 v2024.5.13
+	github.com/sty-holdings/sty-shared/v2024 v2024.7.9
 	golang.org/x/text v0.14.0
 )
 
@@ -61,5 +61,5 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/grpc v1.56.1 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 )

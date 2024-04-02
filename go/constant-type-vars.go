@@ -42,9 +42,10 @@ const (
 )
 
 type Ai2Client struct {
-	awssPtr     *awss.AWSSession
-	environment string
-	natsService ns.NATSService
-	natsConfig  ns.NATSConfiguration
-	secretKey   string
+	awssPtr       *awss.AWSSession
+	environment   string
+	natsService   ns.NATSService
+	natsConfig    ns.NATSConfiguration
+	secretKey     string
+	tempDirectory string
 }
