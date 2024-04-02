@@ -41,7 +41,7 @@ var (
 	generateConfig bool
 	password       string
 	environment    = "production" // this is the default. For development, use 'development'.
-	programName    = "AI2-client for go"
+	programName    = "Ai2C-go-client"
 	secretKey      string
 	tempDirectory  string
 	testingOn      bool
@@ -99,7 +99,7 @@ func main() {
 	log.Printf("Running %v.\n", programName)
 
 	if generateConfig {
-		config.GenerateConfigFileSkeleton(programName, "go/config/")
+		config.GenerateConfigFileSkeleton(programName, "config/")
 		os.Exit(0)
 	}
 

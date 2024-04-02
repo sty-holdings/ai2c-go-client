@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ai2c-go-client -gc" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="ai2c-go-client" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="-gc " />
+    <kind value="PACKAGE" />
+    <package value="ai2c-go-client" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/main.go" />
+    <method v="2">
+      <option name="GoBeforeRunTask" command="get github.com/sty-holdings/constant-type-vars-go/v2024" />
+      <option name="GoBeforeRunTask" command="get github.com/sty-holdings/sty-shared/v2024" />
+    </method>
+  </configuration>
+</component>
