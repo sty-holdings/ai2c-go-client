@@ -1,4 +1,4 @@
-// Package main
+// Package src
 /*
 This is a client for STY Holdings services
 
@@ -23,7 +23,7 @@ COPYRIGHT:
 	limitations under the License.
 
 */
-package main
+package src
 
 import (
 	"fmt"

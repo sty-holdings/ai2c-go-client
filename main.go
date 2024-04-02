@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 
+	"ai2c-go-client/src"
 	"github.com/integrii/flaggy"
 	ctv "github.com/sty-holdings/constant-type-vars-go/v2024"
 	config "github.com/sty-holdings/sty-shared/v2024/configuration"
@@ -131,10 +132,10 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 
 	var (
 		errorInfo pi.ErrorInfo
-		clientPtr Ai2Client
+		clientPtr src.Ai2Client
 	)
 
-	if clientPtr, errorInfo = NewAI2Client(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
+	if clientPtr, errorInfo = src.NewAI2Client(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		flaggy.ShowHelpAndExit("")
 	}

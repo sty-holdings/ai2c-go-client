@@ -1,4 +1,4 @@
-// Package main
+// Package src
 /*
 General description of the purpose of the go file.
 
@@ -29,7 +29,7 @@ COPYRIGHT:
 	limitations under the License.
 
 */
-package main
+package src
 
 import (
 	awss "github.com/sty-holdings/sty-shared/v2024/awsServices"
