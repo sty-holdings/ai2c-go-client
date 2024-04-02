@@ -1,1 +1,1 @@
-# nc-stripe
+# ai2c-go-client
