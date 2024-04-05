@@ -26,10 +26,13 @@ COPYRIGHT:
 package src
 
 import (
+	"encoding/json"
 	"fmt"
+	"runtime"
 	"strconv"
 
 	awsSSM "github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/nats-io/nats.go"
 	ctv "github.com/sty-holdings/constant-type-vars-go/v2024"
 	awss "github.com/sty-holdings/sty-shared/v2024/awsServices"
 	cfgs "github.com/sty-holdings/sty-shared/v2024/configuration"
@@ -39,8 +42,55 @@ import (
 	pi "github.com/sty-holdings/sty-shared/v2024/programInfo"
 )
 
-func NewAI2Client(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) (
-	ai2ClientPtr Ai2Client,
+//goland:noinspection ALL
+const (
+	PROGRAM_NAME = "ai2c-go-client"
+)
+
+type Ai2CClient struct {
+	awssPtr       *awss.AWSSession
+	environment   string
+	natsService   ns.NATSService
+	natsConfig    ns.NATSConfiguration
+	secretKey     string
+	tempDirectory string
+}
+
+type Ai2CInfo struct {
+	Amount                  float64 `json:"amount,omitempty"`
+	AutomaticPaymentMethods bool    `json:"automatic_payment_methods,omitempty"`
+	CancellationReason      string  `json:"cancellation_reason,omitempty"`
+	CaptureMethod           string  `json:"capture_method,omitempty"`
+	Currency                string  `json:"currency,omitempty"`
+	CustomerId              string  `json:"customer_id,omitempty"`
+	Description             string  `json:"description,omitempty"`
+	Key                     string  `json:"key"`
+	Limit                   int64   `json:"limit,omitempty"`
+	PaymentIntentId         string  `json:"id,omitempty"`
+	PaymentMethod           string  `json:"payment_method,omitempty"`
+	ReceiptEmail            string  `json:"receipt_email,omitempty"`
+	ReturnURL               string  `json:"return_url,omitempty,omitempty"`
+	StartingAfter           string  `json:"starting_after,omitempty"`
+}
+
+type PaymentIntentRequest struct {
+	Amount                  float64 `json:"amount"`
+	AutomaticPaymentMethods bool    `json:"automatic_payment_methods,omitempty"`
+	Currency                string  `json:"currency"`
+	Description             string  `json:"description,omitempty"`
+	Key                     string  `json:"key"`
+	ReceiptEmail            string  `json:"receipt_email"`
+	ReturnURL               string  `json:"return_url,omitempty"`
+	// Confirm            bool     `json:"confirm,omitempty"`
+	// PaymentMethodTypes []string `json:"payment_method_types,omitempty"`
+}
+
+type Ai2CHeader struct {
+	clientId string `json:"client_id"`
+}
+
+func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) (
+	ai2cClientPtr Ai2CClient,
 	errorInfo pi.ErrorInfo,
 ) {
 
@@ -108,50 +158,77 @@ func NewAI2Client(clientId, environment, password, secretKey, tempDirectory, use
 		return
 	}
 
-	if ai2ClientPtr.awssPtr, errorInfo = awss.NewAWSConfig(tEnvironment); errorInfo.Error != nil {
+	if ai2cClientPtr.awssPtr, errorInfo = awss.NewAWSConfig(tEnvironment); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
-	ai2ClientPtr.environment = tEnvironment
-	ai2ClientPtr.tempDirectory = tTempDirectory
+	ai2cClientPtr.environment = tEnvironment
+	ai2cClientPtr.tempDirectory = tTempDirectory
 
-	if errorInfo = awss.Login(ctv.AUTH_USER_SRP, tUsername, &tPassword, ai2ClientPtr.awssPtr); errorInfo.Error != nil {
+	if errorInfo = awss.Login(ctv.AUTH_USER_SRP, tUsername, &tPassword, ai2cClientPtr.awssPtr); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
 
-	ai2ClientPtr.secretKey = tSecretKey
+	ai2cClientPtr.secretKey = tSecretKey
 	tPassword = ctv.TXT_PROTECTED  // Clear the password from memory.
 	secretKey = ctv.TXT_PROTECTED  // Clear the secret key from memory.
 	tSecretKey = ctv.TXT_PROTECTED // Clear the secret key from memory.
 
-	if errorInfo = processAWSClientParameters(ai2ClientPtr.awssPtr, tEnvironment, &ai2ClientPtr.natsConfig); errorInfo.Error != nil {
+	if errorInfo = processAWSClientParameters(ai2cClientPtr.awssPtr, tEnvironment, &ai2cClientPtr.natsConfig); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
 
-	if errorInfo = ns.BuildTemporaryFiles(ai2ClientPtr.tempDirectory, ai2ClientPtr.natsConfig); errorInfo.Error != nil {
+	if errorInfo = ns.BuildTemporaryFiles(ai2cClientPtr.tempDirectory, ai2cClientPtr.natsConfig); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
-	ai2ClientPtr.natsConfig.NATSCredentialsFilename = fmt.Sprintf("%v/%v", tTempDirectory, ns.CREDENTIAL_FILENAME)
+	ai2cClientPtr.natsConfig.NATSCredentialsFilename = fmt.Sprintf("%v/%v", tTempDirectory, ns.CREDENTIAL_FILENAME)
 
-	if errorInfo = jwts.BuildTLSTemporaryFiles(ai2ClientPtr.tempDirectory, ai2ClientPtr.natsConfig.NATSTLSInfo); errorInfo.Error != nil {
+	if errorInfo = jwts.BuildTLSTemporaryFiles(ai2cClientPtr.tempDirectory, ai2cClientPtr.natsConfig.NATSTLSInfo); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
-	ai2ClientPtr.natsConfig.NATSTLSInfo.TLSCABundleFQN = fmt.Sprintf("%v/%v", tTempDirectory, jwts.TLS_CA_BUNDLE_FILENAME)
-	ai2ClientPtr.natsConfig.NATSTLSInfo.TLSCertFQN = fmt.Sprintf("%v/%v", tTempDirectory, jwts.TLS_CERT_FILENAME)
-	ai2ClientPtr.natsConfig.NATSTLSInfo.TLSPrivateKeyFQN = fmt.Sprintf("%v/%v", tTempDirectory, jwts.TLS_PRIVATE_KEY_FILENAME)
+	ai2cClientPtr.natsConfig.NATSTLSInfo.TLSCABundleFQN = fmt.Sprintf("%v/%v", tTempDirectory, jwts.TLS_CA_BUNDLE_FILENAME)
+	ai2cClientPtr.natsConfig.NATSTLSInfo.TLSCertFQN = fmt.Sprintf("%v/%v", tTempDirectory, jwts.TLS_CERT_FILENAME)
+	ai2cClientPtr.natsConfig.NATSTLSInfo.TLSPrivateKeyFQN = fmt.Sprintf("%v/%v", tTempDirectory, jwts.TLS_PRIVATE_KEY_FILENAME)
 
-	if ai2ClientPtr.natsService.InstanceName, errorInfo = ns.BuildInstanceName(ns.METHOD_DASHES, awss.GetClientId(ai2ClientPtr.awssPtr)); errorInfo.Error != nil {
+	if ai2cClientPtr.natsService.InstanceName, errorInfo = ns.BuildInstanceName(ns.METHOD_DASHES, awss.GetClientId(ai2cClientPtr.awssPtr)); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
-	if ai2ClientPtr.natsService.ConnPtr, errorInfo = ns.GetConnection(ai2ClientPtr.natsService.InstanceName, ai2ClientPtr.natsConfig); errorInfo.Error != nil {
+	if ai2cClientPtr.natsService.ConnPtr, errorInfo = ns.GetConnection(ai2cClientPtr.natsService.InstanceName, ai2cClientPtr.natsConfig); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
+
+	return
+}
+
+func (ai2cClientPtr *Ai2CClient) AI2Request(ai2cInfo Ai2CInfo) (
+	errorInfo pi.ErrorInfo,
+) {
+
+	if ai2cInfo.Key <= ctv.VAL_EMPTY {
+		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_AI2C_KEY, ctv.FN_KEY))
+		return
+	}
+
+	if ai2cInfo.Amount > 0 { // Use wants to create a payment
+		processCreatePaymentIntent(&ai2cClientPtr.natsService, ai2cInfo)
+		return
+	}
+
+	// if ai2cInfo.CustomerId != ctv.VAL_EMPTY {
+	// 	processStripeCustomer(ai2cInfo)
+	// 	return
+	// }
+	//
+	// if ai2cInfo.PaymentIntentId != ctv.VAL_EMPTY {
+	// 	processStripeCustomer(ai2cInfo)
+	// 	return
+	// }
 
 	return
 }
@@ -191,25 +268,56 @@ func processAWSClientParameters(
 	for _, parameter := range tParametersOutput.Parameters {
 		tParameterName = *parameter.Name
 		tParameterValue = *parameter.Value
-		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_NATS_TOKEN, PROGRAM_NAME, environment) {
+		switch tParameterName {
+		case ctv.GetParameterName(ctv.PARAMETER_NATS_TOKEN, PROGRAM_NAME, environment):
 			natsConfigPtr.NATSToken = tParameterValue
-		}
-		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_NATS_PORT, PROGRAM_NAME, environment) {
+		case ctv.GetParameterName(ctv.PARAMETER_NATS_PORT, PROGRAM_NAME, environment):
 			natsConfigPtr.NATSPort, _ = strconv.Atoi(tParameterValue)
-		}
-		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_NATS_URL, PROGRAM_NAME, environment) {
+		case ctv.GetParameterName(ctv.PARAMETER_NATS_URL, PROGRAM_NAME, environment):
 			natsConfigPtr.NATSURL = tParameterValue
-		}
-		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_TLS_CERT, PROGRAM_NAME, environment) {
+		case ctv.GetParameterName(ctv.PARAMETER_TLS_CERT, PROGRAM_NAME, environment):
 			natsConfigPtr.NATSTLSInfo.TLSCert = tParameterValue
-		}
-		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_TLS_PRIVATE_KEY, PROGRAM_NAME, environment) {
+		case ctv.GetParameterName(ctv.PARAMETER_TLS_PRIVATE_KEY, PROGRAM_NAME, environment):
 			natsConfigPtr.NATSTLSInfo.TLSPrivateKey = tParameterValue
-		}
-		if tParameterName == ctv.GetParameterName(ctv.PARAMETER_TLS_CA_BUNDLE, PROGRAM_NAME, environment) {
+		case ctv.GetParameterName(ctv.PARAMETER_TLS_CA_BUNDLE, PROGRAM_NAME, environment):
 			natsConfigPtr.NATSTLSInfo.TLSCABundle = tParameterValue
+		default:
+			// Optional: Handle unknown parameter names (log a warning?)
 		}
 	}
+
+	return
+}
+
+func processCreatePaymentIntent(
+	natsServicePtr *ns.NATSService,
+	ai2cInfo Ai2CInfo,
+) (errorInfo pi.ErrorInfo) {
+
+	var (
+		tFunction, _, _, _ = runtime.Caller(0)
+		tFunctionName      = runtime.FuncForPC(tFunction).Name()
+		tPIR               PaymentIntentRequest
+		tRequestData       []byte
+		tRequestMsg        *nats.Msg
+	)
+
+	tPIR = PaymentIntentRequest{
+		Amount:                  ai2cInfo.Amount,
+		AutomaticPaymentMethods: ai2cInfo.AutomaticPaymentMethods,
+		Currency:                ai2cInfo.Currency,
+		Description:             ai2cInfo.Description,
+		Key:                     "",
+		ReceiptEmail:            ai2cInfo.ReceiptEmail,
+		ReturnURL:               ai2cInfo.ReturnURL,
+	}
+
+	if tRequestData, errorInfo.Error = json.Marshal(tPIR); errorInfo.Error != nil {
+		errorInfo = pi.NewErrorInfo(errorInfo.Error, fmt.Sprintf("%v%v - %v%v", ctv.TXT_FUNCTION_NAME, tFunctionName, ctv.TXT_SUBJECT, ctv.SUB_STRIPE_CREATE_PAYMENT_INTENT))
+		return
+	}
+
+	ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName)
 
 	return
 }

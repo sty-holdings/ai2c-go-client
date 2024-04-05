@@ -132,10 +132,10 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 
 	var (
 		errorInfo pi.ErrorInfo
-		clientPtr src.Ai2Client
+		clientPtr src.Ai2CClient
 	)
 
-	if clientPtr, errorInfo = src.NewAI2Client(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
+	if clientPtr, errorInfo = src.NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		flaggy.ShowHelpAndExit("")
 	}
