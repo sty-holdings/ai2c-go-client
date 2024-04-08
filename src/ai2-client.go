@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+	"time"
 
 	awsSSM "github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/nats-io/nats.go"
@@ -44,11 +45,13 @@ import (
 
 //goland:noinspection ALL
 const (
-	PROGRAM_NAME = "ai2c-go-client"
+	PROGRAM_NAME              = "ai2c-go-client"
+	AI2C_SSM_PARAMETER_PREFIX = "ai2c"
 )
 
 type Ai2CClient struct {
 	awssPtr       *awss.AWSSession
+	clientId      string
 	environment   string
 	natsService   ns.NATSService
 	natsConfig    ns.NATSConfiguration
@@ -83,10 +86,6 @@ type PaymentIntentRequest struct {
 	ReturnURL               string  `json:"return_url,omitempty"`
 	// Confirm            bool     `json:"confirm,omitempty"`
 	// PaymentMethodTypes []string `json:"payment_method_types,omitempty"`
-}
-
-type Ai2CHeader struct {
-	clientId string `json:"client_id"`
 }
 
 func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) (
@@ -164,6 +163,7 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 	}
 	ai2cClientPtr.environment = tEnvironment
 	ai2cClientPtr.tempDirectory = tTempDirectory
+	ai2cClientPtr.clientId = tClientId
 
 	if errorInfo = awss.Login(ctv.AUTH_USER_SRP, tUsername, &tPassword, ai2cClientPtr.awssPtr); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
@@ -216,7 +216,7 @@ func (ai2cClientPtr *Ai2CClient) AI2Request(ai2cInfo Ai2CInfo) (
 	}
 
 	if ai2cInfo.Amount > 0 { // Use wants to create a payment
-		processCreatePaymentIntent(&ai2cClientPtr.natsService, ai2cInfo)
+		processCreatePaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2cInfo)
 		return
 	}
 
@@ -254,12 +254,12 @@ func processAWSClientParameters(
 
 	if tParametersOutput, errorInfo = awss.GetParameters(
 		awssPtr,
-		ctv.GetParameterName(ctv.PARAMETER_NATS_TOKEN, PROGRAM_NAME, environment),
-		ctv.GetParameterName(ctv.PARAMETER_NATS_PORT, PROGRAM_NAME, environment),
-		ctv.GetParameterName(ctv.PARAMETER_NATS_URL, PROGRAM_NAME, environment),
-		ctv.GetParameterName(ctv.PARAMETER_TLS_CERT, PROGRAM_NAME, environment),
-		ctv.GetParameterName(ctv.PARAMETER_TLS_PRIVATE_KEY, PROGRAM_NAME, environment),
-		ctv.GetParameterName(ctv.PARAMETER_TLS_CA_BUNDLE, PROGRAM_NAME, environment),
+		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_TOKEN),
+		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_PORT),
+		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_URL),
+		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_TLS_CERT),
+		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_TLS_PRIVATE_KEY),
+		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_TLS_CA_BUNDLE),
 	); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
@@ -269,17 +269,17 @@ func processAWSClientParameters(
 		tParameterName = *parameter.Name
 		tParameterValue = *parameter.Value
 		switch tParameterName {
-		case ctv.GetParameterName(ctv.PARAMETER_NATS_TOKEN, PROGRAM_NAME, environment):
+		case ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_TOKEN):
 			natsConfigPtr.NATSToken = tParameterValue
-		case ctv.GetParameterName(ctv.PARAMETER_NATS_PORT, PROGRAM_NAME, environment):
+		case ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_PORT):
 			natsConfigPtr.NATSPort, _ = strconv.Atoi(tParameterValue)
-		case ctv.GetParameterName(ctv.PARAMETER_NATS_URL, PROGRAM_NAME, environment):
+		case ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_URL):
 			natsConfigPtr.NATSURL = tParameterValue
-		case ctv.GetParameterName(ctv.PARAMETER_TLS_CERT, PROGRAM_NAME, environment):
+		case ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_TLS_CERT):
 			natsConfigPtr.NATSTLSInfo.TLSCert = tParameterValue
-		case ctv.GetParameterName(ctv.PARAMETER_TLS_PRIVATE_KEY, PROGRAM_NAME, environment):
+		case ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_TLS_PRIVATE_KEY):
 			natsConfigPtr.NATSTLSInfo.TLSPrivateKey = tParameterValue
-		case ctv.GetParameterName(ctv.PARAMETER_TLS_CA_BUNDLE, PROGRAM_NAME, environment):
+		case ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_TLS_CA_BUNDLE):
 			natsConfigPtr.NATSTLSInfo.TLSCABundle = tParameterValue
 		default:
 			// Optional: Handle unknown parameter names (log a warning?)
@@ -290,6 +290,7 @@ func processAWSClientParameters(
 }
 
 func processCreatePaymentIntent(
+	clientId string,
 	natsServicePtr *ns.NATSService,
 	ai2cInfo Ai2CInfo,
 ) (errorInfo pi.ErrorInfo) {
@@ -317,7 +318,11 @@ func processCreatePaymentIntent(
 		return
 	}
 
-	ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName)
+	tRequestMsg.Header.Add(ctv.FN_CLIENT_ID, clientId)
+	tRequestMsg.Data = tRequestData
+	tRequestMsg.Subject = ctv.SUB_STRIPE_CREATE_PAYMENT_INTENT
+
+	ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, tRequestMsg, 2*time.Second)
 
 	return
 }

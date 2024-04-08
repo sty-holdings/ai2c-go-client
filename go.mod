@@ -5,8 +5,8 @@ go 1.21.5
 require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.49.2
 	github.com/integrii/flaggy v1.5.2
-	github.com/sty-holdings/constant-type-vars-go/v2024 v2024.6.0
-	github.com/sty-holdings/sty-shared/v2024 v2024.11.0
+	github.com/sty-holdings/constant-type-vars-go/v2024 v2024.6.1
+	github.com/sty-holdings/sty-shared/v2024 v2024.11.1
 	golang.org/x/text v0.14.0
 )
 
@@ -34,7 +34,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.23.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.4 // indirect
 	github.com/aws/smithy-go v1.20.1 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect

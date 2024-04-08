@@ -71,6 +71,8 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/golang-jwt/jwt/v5 v5.2.0 h1:d/ix8ftRUorsN+5eMIlF4T6J8CAt9rch3My2winC1Jw=
 github.com/golang-jwt/jwt/v5 v5.2.0/go.mod h1:pqrtFR0X4osieyHYxtmOUWsAWrfe1Q5UVIyoH402zdk=
+github.com/golang-jwt/jwt/v5 v5.2.1 h1:OuVbFODueb089Lh128TAcimifWaLhJwVflnrgM17wHk=
+github.com/golang-jwt/jwt/v5 v5.2.1/go.mod h1:pqrtFR0X4osieyHYxtmOUWsAWrfe1Q5UVIyoH402zdk=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da h1:oI5xCqsCo564l8iNU+DwB5epxmsaqB+rhGL0m5jtYqE=
@@ -152,6 +154,8 @@ github.com/sty-holdings/constant-type-vars-go/v2024 v2024.5.17 h1:HEuh9SVgpBdfgS
 github.com/sty-holdings/constant-type-vars-go/v2024 v2024.5.17/go.mod h1:Jz0ZqiDnCx+0M+LFtoQUQUdX7lZbaWT1cFmotivbCxQ=
 github.com/sty-holdings/constant-type-vars-go/v2024 v2024.6.0 h1:mXUKsV8N1pxsCJOQThxM/3ut6fnv9bppaMsabhr6Es8=
 github.com/sty-holdings/constant-type-vars-go/v2024 v2024.6.0/go.mod h1:Jz0ZqiDnCx+0M+LFtoQUQUdX7lZbaWT1cFmotivbCxQ=
+github.com/sty-holdings/constant-type-vars-go/v2024 v2024.6.1 h1:aXkLizvRc8MajyPxyAxxQ9vs9dUmEwu/p0MOIWhGpGY=
+github.com/sty-holdings/constant-type-vars-go/v2024 v2024.6.1/go.mod h1:Jz0ZqiDnCx+0M+LFtoQUQUdX7lZbaWT1cFmotivbCxQ=
 github.com/sty-holdings/sty-shared/v2024 v2024.8.0 h1:zioOphxavTGvaYPk+sWcWv2Y6ULqVO3LniET00RiPp8=
 github.com/sty-holdings/sty-shared/v2024 v2024.8.0/go.mod h1:ZABjmOrHYSL5Jaf2FQNm1OM5bKn0E0L6Ukact78nlDg=
 github.com/sty-holdings/sty-shared/v2024 v2024.8.1 h1:OCyyBgHCDRtXM8NKqweRe8jng4grrZfu1g7aUlsaUSg=
@@ -168,6 +172,8 @@ github.com/sty-holdings/sty-shared/v2024 v2024.9.2 h1:xauLUnUK2Quw8Yu/acfJPU1HEB
 github.com/sty-holdings/sty-shared/v2024 v2024.9.2/go.mod h1:ZABjmOrHYSL5Jaf2FQNm1OM5bKn0E0L6Ukact78nlDg=
 github.com/sty-holdings/sty-shared/v2024 v2024.11.0 h1:tRVlhq0OW9gaW3JoYEP9lWys7ohSj73knbLnmx2emyk=
 github.com/sty-holdings/sty-shared/v2024 v2024.11.0/go.mod h1:ZABjmOrHYSL5Jaf2FQNm1OM5bKn0E0L6Ukact78nlDg=
+github.com/sty-holdings/sty-shared/v2024 v2024.11.1 h1:bCDRC7JiySjQsHlEIDlKLcPWcsXiBPDWXIAbbTlHylU=
+github.com/sty-holdings/sty-shared/v2024 v2024.11.1/go.mod h1:hR6GFdlMdEFeqcBED3vQSxE2qzvsaAFzpX+aYvL/NzI=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.opencensus.io v0.24.0 h1:y73uSU6J157QMP2kn2r30vwW1A2W2WFwSCGnAVxeaD0=
 go.opencensus.io v0.24.0/go.mod h1:vNK8G9p7aAivkbmorf4v+7Hgx+Zs0yY+0fOtgBfjQKo=
