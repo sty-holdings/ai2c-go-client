@@ -131,8 +131,9 @@ func main() {
 func run(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) {
 
 	var (
-		errorInfo pi.ErrorInfo
 		clientPtr src.Ai2CClient
+		data      src.Ai2CInfo
+		errorInfo pi.ErrorInfo
 	)
 
 	if clientPtr, errorInfo = src.NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
@@ -140,5 +141,23 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 		flaggy.ShowHelpAndExit("")
 	}
 
-	fmt.Println(clientPtr)
+	data = src.Ai2CInfo{
+		Amount:                  111.11,
+		AutomaticPaymentMethods: false,
+		CancellationReason:      "",
+		CaptureMethod:           "",
+		Currency:                "USD",
+		CustomerId:              "",
+		Description:             "",
+		SaaSKey:                 "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
+		Limit:                   0,
+		PaymentIntentId:         "",
+		PaymentMethod:           "",
+		ReceiptEmail:            "",
+		ReturnURL:               "",
+		StartingAfter:           "",
+	}
+
+	clientPtr.AI2Request(data)
+
 }

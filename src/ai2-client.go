@@ -67,7 +67,7 @@ type Ai2CInfo struct {
 	Currency                string  `json:"currency,omitempty"`
 	CustomerId              string  `json:"customer_id,omitempty"`
 	Description             string  `json:"description,omitempty"`
-	Key                     string  `json:"key"`
+	SaaSKey                 string  `json:"saas_key"`
 	Limit                   int64   `json:"limit,omitempty"`
 	PaymentIntentId         string  `json:"id,omitempty"`
 	PaymentMethod           string  `json:"payment_method,omitempty"`
@@ -81,7 +81,7 @@ type PaymentIntentRequest struct {
 	AutomaticPaymentMethods bool    `json:"automatic_payment_methods,omitempty"`
 	Currency                string  `json:"currency"`
 	Description             string  `json:"description,omitempty"`
-	Key                     string  `json:"key"`
+	SaaSKey                 string  `json:"saas_key"`
 	ReceiptEmail            string  `json:"receipt_email"`
 	ReturnURL               string  `json:"return_url,omitempty"`
 	// Confirm            bool     `json:"confirm,omitempty"`
@@ -210,13 +210,18 @@ func (ai2cClientPtr *Ai2CClient) AI2Request(ai2cInfo Ai2CInfo) (
 	errorInfo pi.ErrorInfo,
 ) {
 
-	if ai2cInfo.Key <= ctv.VAL_EMPTY {
+	if ai2cInfo.SaaSKey <= ctv.VAL_EMPTY {
 		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_AI2C_KEY, ctv.FN_KEY))
 		return
 	}
 
 	if ai2cInfo.Amount > 0 { // Use wants to create a payment
 		processCreatePaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2cInfo)
+		return
+	}
+
+	if ai2cInfo.Amount == 0 { // Use wants to create a payment
+		// processListPaymentMethods(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2cInfo)
 		return
 	}
 
@@ -298,9 +303,10 @@ func processCreatePaymentIntent(
 	var (
 		tFunction, _, _, _ = runtime.Caller(0)
 		tFunctionName      = runtime.FuncForPC(tFunction).Name()
+		tNATSHeader        = make(map[string][]string)
 		tPIR               PaymentIntentRequest
 		tRequestData       []byte
-		tRequestMsg        *nats.Msg
+		tRequestMsg        nats.Msg
 	)
 
 	tPIR = PaymentIntentRequest{
@@ -308,7 +314,7 @@ func processCreatePaymentIntent(
 		AutomaticPaymentMethods: ai2cInfo.AutomaticPaymentMethods,
 		Currency:                ai2cInfo.Currency,
 		Description:             ai2cInfo.Description,
-		Key:                     "",
+		SaaSKey:                 ai2cInfo.SaaSKey,
 		ReceiptEmail:            ai2cInfo.ReceiptEmail,
 		ReturnURL:               ai2cInfo.ReturnURL,
 	}
@@ -318,11 +324,15 @@ func processCreatePaymentIntent(
 		return
 	}
 
-	tRequestMsg.Header.Add(ctv.FN_CLIENT_ID, clientId)
-	tRequestMsg.Data = tRequestData
-	tRequestMsg.Subject = ctv.SUB_STRIPE_CREATE_PAYMENT_INTENT
+	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
 
-	ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, tRequestMsg, 2*time.Second)
+	tRequestMsg = nats.Msg{
+		Subject: ctv.SUB_STRIPE_CREATE_PAYMENT_INTENT,
+		Header:  tNATSHeader,
+		Data:    tRequestData,
+	}
+
+	ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)
 
 	return
 }
