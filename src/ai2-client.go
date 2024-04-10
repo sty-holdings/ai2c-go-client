@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	awsSSM "github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -59,21 +60,38 @@ type Ai2CClient struct {
 	tempDirectory string
 }
 
-type Ai2CInfo struct {
-	Amount                  float64 `json:"amount,omitempty"`
-	AutomaticPaymentMethods bool    `json:"automatic_payment_methods,omitempty"`
-	CancellationReason      string  `json:"cancellation_reason,omitempty"`
-	CaptureMethod           string  `json:"capture_method,omitempty"`
-	Currency                string  `json:"currency,omitempty"`
-	CustomerId              string  `json:"customer_id,omitempty"`
-	Description             string  `json:"description,omitempty"`
-	SaaSKey                 string  `json:"saas_key"`
-	Limit                   int64   `json:"limit,omitempty"`
-	PaymentIntentId         string  `json:"id,omitempty"`
-	PaymentMethod           string  `json:"payment_method,omitempty"`
-	ReceiptEmail            string  `json:"receipt_email,omitempty"`
-	ReturnURL               string  `json:"return_url,omitempty,omitempty"`
-	StartingAfter           string  `json:"starting_after,omitempty"`
+type Ai2CPaymentInfo struct {
+	Amount                    float64  `json:"amount,omitempty"`
+	UseAutomaticPaymentMethod bool     `json:"use_automatic_payment_method,omitempty"`
+	CancellationReason        string   `json:"cancellation_reason,omitempty"`
+	CaptureFunds              string   `json:"capture_funds,omitempty"`
+	Currency                  string   `json:"currency,omitempty"`
+	CustomerId                string   `json:"customer_id,omitempty"`
+	Description               string   `json:"description,omitempty"`
+	ReturnRecordsLimit        int64    `json:"return_records_limit,omitempty"`
+	PaymentIntentId           string   `json:"id,omitempty"`
+	PaymentMethod             string   `json:"payment_method,omitempty"`
+	ReceiptEmail              string   `json:"receipt_email,omitempty"`
+	ReturnURL                 string   `json:"return_url,omitempty,omitempty"`
+	StartingAfterRecord       string   `json:"starting_after_record,omitempty"`
+	Keys                      SaaSKeys `json:"keys,omitempty"`
+}
+
+type CancelPaymentIntentRequest struct {
+	SaaSKey            string `json:"saas_key"`
+	PaymentIntentId    string `json:"id"`
+	CancellationReason string `json:"cancellation_reason"`
+}
+
+type ListPaymentIntentRequest struct {
+	SaaSKey       string `json:"saas_key"`
+	CustomerId    string `json:"customer_id,omitempty"`
+	Limit         int64  `json:"limit,omitempty"`
+	StartingAfter string `json:"starting_after,omitempty"`
+}
+
+type ListPaymentMethodRequest struct {
+	SaaSKey string `json:"saas_key"`
 }
 
 type PaymentIntentRequest struct {
@@ -86,6 +104,11 @@ type PaymentIntentRequest struct {
 	ReturnURL               string  `json:"return_url,omitempty"`
 	// Confirm            bool     `json:"confirm,omitempty"`
 	// PaymentMethodTypes []string `json:"payment_method_types,omitempty"`
+}
+
+type SaaSKeys struct {
+	Public string `json:"public_key,omitempty"`
+	Secret string `json:"secret_key,omitempty"`
 }
 
 func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) (
@@ -206,34 +229,73 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 	return
 }
 
-func (ai2cClientPtr *Ai2CClient) AI2Request(ai2cInfo Ai2CInfo) (
+// AI2PaymentRequest - handles all payment requests. The SaaS providers public or secret key must be provided.
+//
+// **Cancelling a payment**
+// CancellationReason in ai2CPaymentInfo specifies the reason for cancellation.
+// The SaaSKey and PaymentIntentId in ai2CPaymentInfo are used to identify the payment to cancel.
+// If ai2CPaymentInfo.Keys.Public is empty, ai2CPaymentInfo.Keys.Secret is used as the SaaSKey.
+//
+// **List Payments**
+// List payment intents based on the ReturnRecordsLimit which must be set to a value between 1 and 100.
+// Providing the CustomerId will only return payments for that customer. The StartingAfterRecord is the
+// pointer where the list return the next record up to the limit.
+//
+// **List Payment Methods**
+// List payment methods is requested when the PaymentMethod is set to LIST.
+//
+// **Create Payment**
+// Creates a payment request when positive amount and the currency are provided.
+//
+// Customer Messages: None
+// Errors: None
+// Verifications: None
+func (ai2cClientPtr *Ai2CClient) AI2PaymentRequest(ai2CPaymentInfo Ai2CPaymentInfo) (
+	reply string,
 	errorInfo pi.ErrorInfo,
 ) {
 
-	if ai2cInfo.SaaSKey <= ctv.VAL_EMPTY {
-		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_AI2C_KEY, ctv.FN_KEY))
+	var (
+		tReply *nats.Msg
+	)
+
+	if ai2CPaymentInfo.Keys.Public == ctv.VAL_EMPTY && ai2CPaymentInfo.Keys.Secret == ctv.VAL_EMPTY {
+		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v and %v %v", ctv.TXT_PUBLIC_KEY, ctv.TXT_SECRET_KEY, ctv.TXT_ARE_MISSING))
 		return
 	}
 
-	if ai2cInfo.Amount > 0 { // Use wants to create a payment
-		processCreatePaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2cInfo)
-		return
-	}
-
-	if ai2cInfo.Amount == 0 { // Use wants to create a payment
-		// processListPaymentMethods(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2cInfo)
-		return
-	}
-
-	// if ai2cInfo.CustomerId != ctv.VAL_EMPTY {
-	// 	processStripeCustomer(ai2cInfo)
-	// 	return
-	// }
+	// Determine Request
 	//
-	// if ai2cInfo.PaymentIntentId != ctv.VAL_EMPTY {
-	// 	processStripeCustomer(ai2cInfo)
-	// 	return
-	// }
+	// Request is a cancellation
+	if len(ai2CPaymentInfo.CancellationReason) > ctv.VAL_ZERO && len(ai2CPaymentInfo.PaymentIntentId) > ctv.VAL_ZERO {
+		tReply, errorInfo = processCancelPaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		reply = string(tReply.Data)
+		return
+	}
+	// Request is to list payment intents
+	if ai2CPaymentInfo.ReturnRecordsLimit > ctv.VAL_ZERO {
+		tReply, errorInfo = processListPaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		reply = string(tReply.Data)
+		return
+	}
+	// Request is to list payment methods
+	if strings.ToLower(ai2CPaymentInfo.PaymentMethod) == ctv.PAYMENT_METHOD_LIST {
+		tReply, errorInfo = processListPaymentMethod(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		reply = string(tReply.Data)
+		return
+	}
+	// Request is to create a payment
+	if ai2CPaymentInfo.Amount > 0 && len(ai2CPaymentInfo.Currency) > ctv.VAL_ZERO {
+		tReply, errorInfo = processCreatePaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		reply = string(tReply.Data)
+		return
+	}
+	// Request is to confirm a payment
+	if ai2CPaymentInfo.Amount > 0 && len(ai2CPaymentInfo.Currency) > ctv.VAL_ZERO && len(ai2CPaymentInfo.PaymentIntentId) > ctv.VAL_ZERO {
+		tReply, errorInfo = processCreatePaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		reply = string(tReply.Data)
+		return
+	}
 
 	return
 }
@@ -294,29 +356,101 @@ func processAWSClientParameters(
 	return
 }
 
-func processCreatePaymentIntent(
+// processCancelPaymentIntent - handles cancelling a payment intent by sending a request to the NATS service.
+// CancellationReason in ai2CPaymentInfo specifies the reason for cancellation.
+// The SaaSKey and PaymentIntentId in ai2CPaymentInfo are used to identify the payment intent to cancel.
+// If ai2CPaymentInfo.Keys.Public is empty, ai2CPaymentInfo.Keys.Secret is used as the SaaSKey.
+// The cancellation request is serialized to JSON and sent as a NATS message with appropriate headers.
+//
+//	Customer Messages: None
+//	Errors: None
+//	Verifications: None
+func processCancelPaymentIntent(
 	clientId string,
 	natsServicePtr *ns.NATSService,
-	ai2cInfo Ai2CInfo,
-) (errorInfo pi.ErrorInfo) {
+	ai2CPaymentInfo Ai2CPaymentInfo,
+) (
+	reply *nats.Msg,
+	errorInfo pi.ErrorInfo,
+) {
 
 	var (
 		tFunction, _, _, _ = runtime.Caller(0)
 		tFunctionName      = runtime.FuncForPC(tFunction).Name()
+		tKey               string
+		tNATSHeader        = make(map[string][]string)
+		tPIR               CancelPaymentIntentRequest
+		tRequestData       []byte
+		tRequestMsg        nats.Msg
+	)
+
+	if ai2CPaymentInfo.Keys.Public == ctv.VAL_EMPTY {
+		tKey = ai2CPaymentInfo.Keys.Secret
+	} else {
+		tKey = ai2CPaymentInfo.Keys.Public
+	}
+
+	tPIR = CancelPaymentIntentRequest{
+		SaaSKey:            tKey,
+		PaymentIntentId:    ai2CPaymentInfo.PaymentIntentId,
+		CancellationReason: ai2CPaymentInfo.CancellationReason,
+	}
+	if tRequestData, errorInfo.Error = json.Marshal(tPIR); errorInfo.Error != nil {
+		errorInfo = pi.NewErrorInfo(errorInfo.Error, fmt.Sprintf("%v%v - %v%v", ctv.TXT_FUNCTION_NAME, tFunctionName, ctv.TXT_SUBJECT, ctv.SUB_STRIPE_CANCEL_PAYMENT_INTENT))
+		return
+	}
+
+	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
+
+	tRequestMsg = nats.Msg{
+		Subject: ctv.SUB_STRIPE_CANCEL_PAYMENT_INTENT,
+		Header:  tNATSHeader,
+		Data:    tRequestData,
+	}
+
+	reply, errorInfo = ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)
+
+	return
+}
+
+// processCreatePaymentIntent - handles creating a payment intent request and sending it to the NATS service.
+//
+// Customer Messages: None
+// Errors: None
+// Verifications: None
+func processCreatePaymentIntent(
+	clientId string,
+	natsServicePtr *ns.NATSService,
+	ai2CPaymentInfo Ai2CPaymentInfo,
+) (
+	reply *nats.Msg,
+	errorInfo pi.ErrorInfo,
+) {
+
+	var (
+		tFunction, _, _, _ = runtime.Caller(0)
+		tFunctionName      = runtime.FuncForPC(tFunction).Name()
+		tKey               string
 		tNATSHeader        = make(map[string][]string)
 		tPIR               PaymentIntentRequest
 		tRequestData       []byte
 		tRequestMsg        nats.Msg
 	)
 
+	if ai2CPaymentInfo.Keys.Public == ctv.VAL_EMPTY {
+		tKey = ai2CPaymentInfo.Keys.Secret
+	} else {
+		tKey = ai2CPaymentInfo.Keys.Public
+	}
+
 	tPIR = PaymentIntentRequest{
-		Amount:                  ai2cInfo.Amount,
-		AutomaticPaymentMethods: ai2cInfo.AutomaticPaymentMethods,
-		Currency:                ai2cInfo.Currency,
-		Description:             ai2cInfo.Description,
-		SaaSKey:                 ai2cInfo.SaaSKey,
-		ReceiptEmail:            ai2cInfo.ReceiptEmail,
-		ReturnURL:               ai2cInfo.ReturnURL,
+		Amount:                  ai2CPaymentInfo.Amount,
+		AutomaticPaymentMethods: ai2CPaymentInfo.UseAutomaticPaymentMethod,
+		Currency:                ai2CPaymentInfo.Currency,
+		Description:             ai2CPaymentInfo.Description,
+		ReceiptEmail:            ai2CPaymentInfo.ReceiptEmail,
+		ReturnURL:               ai2CPaymentInfo.ReturnURL,
+		SaaSKey:                 tKey,
 	}
 
 	if tRequestData, errorInfo.Error = json.Marshal(tPIR); errorInfo.Error != nil {
@@ -332,7 +466,114 @@ func processCreatePaymentIntent(
 		Data:    tRequestData,
 	}
 
-	ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)
+	reply, errorInfo = ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)
+
+	return
+}
+
+// processListPaymentIntent - sends a NATS request to list payment intents based on the provided criteria.
+// The ReturnRecordsLimit must be set to a value between 1 and 100.
+//
+//	Customer Messages: None
+//	Errors: None
+//	Verifications: None
+func processListPaymentIntent(
+	clientId string,
+	natsServicePtr *ns.NATSService,
+	ai2CPaymentInfo Ai2CPaymentInfo,
+) (
+	reply *nats.Msg,
+	errorInfo pi.ErrorInfo,
+) {
+
+	var (
+		tFunction, _, _, _ = runtime.Caller(0)
+		tFunctionName      = runtime.FuncForPC(tFunction).Name()
+		tKey               string
+		tNATSHeader        = make(map[string][]string)
+		tPIR               ListPaymentIntentRequest
+		tRequestData       []byte
+		tRequestMsg        nats.Msg
+	)
+
+	if ai2CPaymentInfo.Keys.Public == ctv.VAL_EMPTY {
+		tKey = ai2CPaymentInfo.Keys.Secret
+	} else {
+		tKey = ai2CPaymentInfo.Keys.Public
+	}
+
+	tPIR = ListPaymentIntentRequest{
+		SaaSKey:       tKey,
+		CustomerId:    ai2CPaymentInfo.CustomerId,
+		Limit:         ai2CPaymentInfo.ReturnRecordsLimit,
+		StartingAfter: ai2CPaymentInfo.StartingAfterRecord,
+	}
+	if tRequestData, errorInfo.Error = json.Marshal(tPIR); errorInfo.Error != nil {
+		errorInfo = pi.NewErrorInfo(errorInfo.Error, fmt.Sprintf("%v%v - %v%v", ctv.TXT_FUNCTION_NAME, tFunctionName, ctv.TXT_SUBJECT, ctv.SUB_STRIPE_LIST_PAYMENT_INTENTS))
+		return
+	}
+
+	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
+
+	tRequestMsg = nats.Msg{
+		Subject: ctv.SUB_STRIPE_LIST_PAYMENT_INTENTS,
+		Header:  tNATSHeader,
+		Data:    tRequestData,
+	}
+
+	reply, errorInfo = ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)
+
+	return
+}
+
+// processListPaymentMethod - sends a request to list payment methods to the NATS service using the Stripe
+// subject. It marshals the request payload and adds the client ID to the request header.
+//
+//	Customer Messages: None
+//	Errors: None
+//	Verifications: None
+func processListPaymentMethod(
+	clientId string,
+	natsServicePtr *ns.NATSService,
+	ai2CPaymentInfo Ai2CPaymentInfo,
+) (
+	reply *nats.Msg,
+	errorInfo pi.ErrorInfo,
+) {
+
+	var (
+		tFunction, _, _, _ = runtime.Caller(0)
+		tFunctionName      = runtime.FuncForPC(tFunction).Name()
+		tKey               string
+		tNATSHeader        = make(map[string][]string)
+		tPIR               ListPaymentMethodRequest
+		tRequestData       []byte
+		tRequestMsg        nats.Msg
+	)
+
+	if ai2CPaymentInfo.Keys.Public == ctv.VAL_EMPTY {
+		tKey = ai2CPaymentInfo.Keys.Secret
+	} else {
+		tKey = ai2CPaymentInfo.Keys.Public
+	}
+
+	tPIR = ListPaymentMethodRequest{
+		SaaSKey: tKey,
+	}
+	if tRequestData, errorInfo.Error = json.Marshal(tPIR); errorInfo.Error != nil {
+		errorInfo = pi.NewErrorInfo(errorInfo.Error, fmt.Sprintf("%v%v - %v%v", ctv.TXT_FUNCTION_NAME, tFunctionName, ctv.TXT_SUBJECT, ctv.SUB_STRIPE_LIST_PAYMENT_METHODS))
+		return
+	}
+
+	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
+
+	tRequestMsg = nats.Msg{
+		Subject: ctv.SUB_STRIPE_LIST_PAYMENT_METHODS,
+		Header:  tNATSHeader,
+		Data:    tRequestData,
+	}
+
+	reply, errorInfo = ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)
 
 	return
 }

@@ -132,7 +132,7 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 
 	var (
 		clientPtr src.Ai2CClient
-		data      src.Ai2CInfo
+		data      src.Ai2CPaymentInfo
 		errorInfo pi.ErrorInfo
 	)
 
@@ -141,23 +141,46 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 		flaggy.ShowHelpAndExit("")
 	}
 
-	data = src.Ai2CInfo{
-		Amount:                  111.11,
-		AutomaticPaymentMethods: false,
-		CancellationReason:      "",
-		CaptureMethod:           "",
-		Currency:                "USD",
-		CustomerId:              "",
-		Description:             "",
-		SaaSKey:                 "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
-		Limit:                   0,
-		PaymentIntentId:         "",
-		PaymentMethod:           "",
-		ReceiptEmail:            "",
-		ReturnURL:               "",
-		StartingAfter:           "",
+	data = src.Ai2CPaymentInfo{
+		Amount:                    0,
+		UseAutomaticPaymentMethod: false,
+		CancellationReason:        ctv.VAL_EMPTY,
+		CaptureFunds:              ctv.VAL_EMPTY,
+		Currency:                  ctv.VAL_EMPTY,
+		CustomerId:                ctv.VAL_EMPTY,
+		Description:               ctv.VAL_EMPTY,
+		ReturnRecordsLimit:        ctv.VAL_ZERO,
+		PaymentIntentId:           ctv.VAL_EMPTY,
+		PaymentMethod:             ctv.PAYMENT_METHOD_LIST,
+		ReceiptEmail:              ctv.VAL_EMPTY,
+		ReturnURL:                 ctv.VAL_EMPTY,
+		StartingAfterRecord:       ctv.VAL_EMPTY,
+		Keys: src.SaaSKeys{
+			Public: "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
+			Secret: "",
+		},
 	}
+	clientPtr.AI2PaymentRequest(data)
 
-	clientPtr.AI2Request(data)
+	data = src.Ai2CPaymentInfo{
+		Amount:                    123.34,
+		UseAutomaticPaymentMethod: false,
+		CancellationReason:        ctv.VAL_EMPTY,
+		CaptureFunds:              ctv.VAL_EMPTY,
+		Currency:                  ctv.CurrencyUSD,
+		CustomerId:                ctv.VAL_EMPTY,
+		Description:               ctv.VAL_EMPTY,
+		ReturnRecordsLimit:        ctv.VAL_ZERO,
+		PaymentIntentId:           ctv.VAL_EMPTY,
+		PaymentMethod:             ctv.VAL_EMPTY,
+		ReceiptEmail:              ctv.VAL_EMPTY,
+		ReturnURL:                 ctv.VAL_EMPTY,
+		StartingAfterRecord:       ctv.VAL_EMPTY,
+		Keys: src.SaaSKeys{
+			Public: "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
+			Secret: "",
+		},
+	}
+	clientPtr.AI2PaymentRequest(data)
 
 }

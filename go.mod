@@ -5,8 +5,8 @@ go 1.21.5
 require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.49.2
 	github.com/integrii/flaggy v1.5.2
-	github.com/sty-holdings/constant-type-vars-go/v2024 v2024.6.2
-	github.com/sty-holdings/sty-shared/v2024 v2024.11.1
+	github.com/sty-holdings/constant-type-vars-go/v2024 v2024.7.2
+	github.com/sty-holdings/sty-shared/v2024 v2024.12.0
 	golang.org/x/text v0.14.0
 )
 
@@ -47,6 +47,7 @@ require (
 	github.com/nats-io/nats.go v1.33.1 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
+	github.com/stripe/stripe-go/v76 v76.25.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/net v0.22.0 // indirect
