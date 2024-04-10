@@ -27,6 +27,7 @@ import (
 	"os"
 
 	"ai2c-go-client/src"
+	"github.com/hokaccha/go-prettyjson"
 	"github.com/integrii/flaggy"
 	ctv "github.com/sty-holdings/constant-type-vars-go/v2024"
 	config "github.com/sty-holdings/sty-shared/v2024/configuration"
@@ -134,6 +135,7 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 		clientPtr src.Ai2CClient
 		data      src.Ai2CPaymentInfo
 		errorInfo pi.ErrorInfo
+		reply     []byte
 	)
 
 	if clientPtr, errorInfo = src.NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
@@ -142,45 +144,47 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 	}
 
 	data = src.Ai2CPaymentInfo{
-		Amount:                    0,
-		UseAutomaticPaymentMethod: false,
-		CancellationReason:        ctv.VAL_EMPTY,
-		CaptureFunds:              ctv.VAL_EMPTY,
-		Currency:                  ctv.VAL_EMPTY,
-		CustomerId:                ctv.VAL_EMPTY,
-		Description:               ctv.VAL_EMPTY,
-		ReturnRecordsLimit:        ctv.VAL_ZERO,
-		PaymentIntentId:           ctv.VAL_EMPTY,
-		PaymentMethod:             ctv.PAYMENT_METHOD_LIST,
-		ReceiptEmail:              ctv.VAL_EMPTY,
-		ReturnURL:                 ctv.VAL_EMPTY,
-		StartingAfterRecord:       ctv.VAL_EMPTY,
+		PaymentMethod: ctv.PAYMENT_METHOD_LIST,
 		Keys: src.SaaSKeys{
 			Public: "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
 			Secret: "",
 		},
 	}
-	clientPtr.AI2PaymentRequest(data)
+	if reply, errorInfo = clientPtr.AI2PaymentRequest(data); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+	} else {
+		s, _ := prettyjson.Format(reply)
+		fmt.Println(string(s))
+	}
 
 	data = src.Ai2CPaymentInfo{
 		Amount:                    123.34,
 		UseAutomaticPaymentMethod: false,
-		CancellationReason:        ctv.VAL_EMPTY,
-		CaptureFunds:              ctv.VAL_EMPTY,
 		Currency:                  ctv.CurrencyUSD,
-		CustomerId:                ctv.VAL_EMPTY,
-		Description:               ctv.VAL_EMPTY,
-		ReturnRecordsLimit:        ctv.VAL_ZERO,
-		PaymentIntentId:           ctv.VAL_EMPTY,
-		PaymentMethod:             ctv.VAL_EMPTY,
-		ReceiptEmail:              ctv.VAL_EMPTY,
-		ReturnURL:                 ctv.VAL_EMPTY,
-		StartingAfterRecord:       ctv.VAL_EMPTY,
 		Keys: src.SaaSKeys{
 			Public: "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
 			Secret: "",
 		},
 	}
-	clientPtr.AI2PaymentRequest(data)
+	if reply, errorInfo = clientPtr.AI2PaymentRequest(data); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+	} else {
+		s, _ := prettyjson.Format(reply)
+		fmt.Println(string(s))
+	}
+
+	data = src.Ai2CPaymentInfo{
+		ReturnRecordsLimit: 1,
+		Keys: src.SaaSKeys{
+			Public: "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
+			Secret: "",
+		},
+	}
+	if reply, errorInfo = clientPtr.AI2PaymentRequest(data); errorInfo.Error != nil {
+		pi.PrintErrorInfo(errorInfo)
+	} else {
+		s, _ := prettyjson.Format(reply)
+		fmt.Println(string(s))
+	}
 
 }

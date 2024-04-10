@@ -251,7 +251,7 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 // Errors: None
 // Verifications: None
 func (ai2cClientPtr *Ai2CClient) AI2PaymentRequest(ai2CPaymentInfo Ai2CPaymentInfo) (
-	reply string,
+	reply []byte,
 	errorInfo pi.ErrorInfo,
 ) {
 
@@ -269,31 +269,31 @@ func (ai2cClientPtr *Ai2CClient) AI2PaymentRequest(ai2CPaymentInfo Ai2CPaymentIn
 	// Request is a cancellation
 	if len(ai2CPaymentInfo.CancellationReason) > ctv.VAL_ZERO && len(ai2CPaymentInfo.PaymentIntentId) > ctv.VAL_ZERO {
 		tReply, errorInfo = processCancelPaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
-		reply = string(tReply.Data)
+		reply = tReply.Data
 		return
 	}
 	// Request is to list payment intents
 	if ai2CPaymentInfo.ReturnRecordsLimit > ctv.VAL_ZERO {
 		tReply, errorInfo = processListPaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
-		reply = string(tReply.Data)
+		reply = tReply.Data
 		return
 	}
 	// Request is to list payment methods
 	if strings.ToLower(ai2CPaymentInfo.PaymentMethod) == ctv.PAYMENT_METHOD_LIST {
 		tReply, errorInfo = processListPaymentMethod(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
-		reply = string(tReply.Data)
+		reply = tReply.Data
 		return
 	}
 	// Request is to create a payment
 	if ai2CPaymentInfo.Amount > 0 && len(ai2CPaymentInfo.Currency) > ctv.VAL_ZERO {
 		tReply, errorInfo = processCreatePaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
-		reply = string(tReply.Data)
+		reply = tReply.Data
 		return
 	}
 	// Request is to confirm a payment
 	if ai2CPaymentInfo.Amount > 0 && len(ai2CPaymentInfo.Currency) > ctv.VAL_ZERO && len(ai2CPaymentInfo.PaymentIntentId) > ctv.VAL_ZERO {
 		tReply, errorInfo = processCreatePaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
-		reply = string(tReply.Data)
+		reply = tReply.Data
 		return
 	}
 
