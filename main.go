@@ -132,10 +132,11 @@ func main() {
 func run(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) {
 
 	var (
-		clientPtr src.Ai2CClient
-		data      src.Ai2CPaymentInfo
-		errorInfo pi.ErrorInfo
-		reply     []byte
+		clientPtr               src.Ai2CClient
+		data                    src.Ai2CPaymentInfo
+		errorInfo               pi.ErrorInfo
+		stripePublicKeyGoesHere = "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp"
+		reply                   []byte
 	)
 
 	if clientPtr, errorInfo = src.NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
@@ -143,46 +144,55 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 		flaggy.ShowHelpAndExit("")
 	}
 
+	// List available payment methods
 	data = src.Ai2CPaymentInfo{
 		PaymentMethod: ctv.PAYMENT_METHOD_LIST,
 		Keys: src.SaaSKeys{
-			Public: "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
+			Public: stripePublicKeyGoesHere,
 			Secret: "",
 		},
 	}
 	if reply, errorInfo = clientPtr.AI2PaymentRequest(data); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 	} else {
+		fmt.Println("==============================")
+		fmt.Println("List available payment methods")
 		s, _ := prettyjson.Format(reply)
 		fmt.Println(string(s))
 	}
 
+	// Create a payment
 	data = src.Ai2CPaymentInfo{
 		Amount:                    123.34,
 		UseAutomaticPaymentMethod: false,
 		Currency:                  ctv.CurrencyUSD,
 		Keys: src.SaaSKeys{
-			Public: "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
+			Public: stripePublicKeyGoesHere,
 			Secret: "",
 		},
 	}
 	if reply, errorInfo = clientPtr.AI2PaymentRequest(data); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 	} else {
+		fmt.Println("==============================")
+		fmt.Println("Create a payment")
 		s, _ := prettyjson.Format(reply)
 		fmt.Println(string(s))
 	}
 
+	// List a payment
 	data = src.Ai2CPaymentInfo{
 		ReturnRecordsLimit: 1,
 		Keys: src.SaaSKeys{
-			Public: "sk_test_51LalVGK3aJ31D0ASERSRRZ5bxTaMBMm7v5CYgCtLkJ8QCzyd3TecGD4Kv3Wk6NkCWL3LOplumLK30cA3RqOnNtK400cDqiATbp",
+			Public: stripePublicKeyGoesHere,
 			Secret: "",
 		},
 	}
 	if reply, errorInfo = clientPtr.AI2PaymentRequest(data); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 	} else {
+		fmt.Println("==============================")
+		fmt.Println("List a payment")
 		s, _ := prettyjson.Format(reply)
 		fmt.Println(string(s))
 	}
