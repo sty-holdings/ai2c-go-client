@@ -139,6 +139,9 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 		reply                   []byte
 	)
 
+	// The following is all the code the developer needs to use Ai2Connect.io
+
+	// Connect to the Ai2Connect service.
 	if clientPtr, errorInfo = src.NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		flaggy.ShowHelpAndExit("")

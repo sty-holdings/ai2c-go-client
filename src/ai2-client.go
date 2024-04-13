@@ -51,13 +51,13 @@ const (
 )
 
 type Ai2CClient struct {
-	awssPtr       *awss.AWSSession
-	clientId      string
-	environment   string
-	natsService   ns.NATSService
-	natsConfig    ns.NATSConfiguration
-	secretKey     string
-	tempDirectory string
+	awsSessionPtr      *awss.AWSSession
+	environment        string
+	natsService        ns.NATSService
+	natsConfig         ns.NATSConfiguration
+	secretKey          string
+	styhCustomerConfig styhCustomerConfig
+	tempDirectory      string
 }
 
 type Ai2CPaymentInfo struct {
@@ -109,6 +109,13 @@ type PaymentIntentRequest struct {
 type SaaSKeys struct {
 	Public string `json:"public_key,omitempty"`
 	Secret string `json:"secret_key,omitempty"`
+}
+
+type styhCustomerConfig struct {
+	clientId  string
+	secretKey string
+	tokens    awss.CognitoTokens
+	username  string
 }
 
 func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) (
@@ -180,15 +187,20 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 		return
 	}
 
-	if ai2cClientPtr.awssPtr, errorInfo = awss.NewAWSConfig(tEnvironment); errorInfo.Error != nil {
+	if ai2cClientPtr.awsSessionPtr, errorInfo = awss.NewAWSConfig(tEnvironment); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
 	ai2cClientPtr.environment = tEnvironment
 	ai2cClientPtr.tempDirectory = tTempDirectory
-	ai2cClientPtr.clientId = tClientId
 
-	if errorInfo = awss.Login(ctv.AUTH_USER_SRP, tUsername, &tPassword, ai2cClientPtr.awssPtr); errorInfo.Error != nil {
+	if ai2cClientPtr.styhCustomerConfig.clientId,
+		ai2cClientPtr.styhCustomerConfig.tokens.Access,
+		ai2cClientPtr.styhCustomerConfig.tokens.ID,
+		ai2cClientPtr.styhCustomerConfig.tokens.Refresh, errorInfo = awss.Login(
+		ctv.AUTH_USER_SRP, tUsername, &tPassword,
+		ai2cClientPtr.awsSessionPtr,
+	); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
@@ -198,7 +210,12 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 	secretKey = ctv.TXT_PROTECTED  // Clear the secret key from memory.
 	tSecretKey = ctv.TXT_PROTECTED // Clear the secret key from memory.
 
-	if errorInfo = processAWSClientParameters(ai2cClientPtr.awssPtr, tEnvironment, &ai2cClientPtr.natsConfig); errorInfo.Error != nil {
+	if errorInfo = processAWSClientParameters(
+		ai2cClientPtr.awsSessionPtr,
+		ai2cClientPtr.styhCustomerConfig.tokens.ID,
+		tEnvironment,
+		&ai2cClientPtr.natsConfig,
+	); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
@@ -217,7 +234,7 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 	ai2cClientPtr.natsConfig.NATSTLSInfo.TLSCertFQN = fmt.Sprintf("%v/%v", tTempDirectory, jwts.TLS_CERT_FILENAME)
 	ai2cClientPtr.natsConfig.NATSTLSInfo.TLSPrivateKeyFQN = fmt.Sprintf("%v/%v", tTempDirectory, jwts.TLS_PRIVATE_KEY_FILENAME)
 
-	if ai2cClientPtr.natsService.InstanceName, errorInfo = ns.BuildInstanceName(ns.METHOD_DASHES, awss.GetClientId(ai2cClientPtr.awssPtr)); errorInfo.Error != nil {
+	if ai2cClientPtr.natsService.InstanceName, errorInfo = ns.BuildInstanceName(ns.METHOD_DASHES, ai2cClientPtr.styhCustomerConfig.clientId); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
@@ -268,34 +285,34 @@ func (ai2cClientPtr *Ai2CClient) AI2PaymentRequest(ai2CPaymentInfo Ai2CPaymentIn
 	//
 	// Request is a cancellation
 	if len(ai2CPaymentInfo.CancellationReason) > ctv.VAL_ZERO && len(ai2CPaymentInfo.PaymentIntentId) > ctv.VAL_ZERO {
-		tReply, errorInfo = processCancelPaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		tReply, errorInfo = processCancelPaymentIntent(ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService, ai2CPaymentInfo)
 		reply = tReply.Data
 		return
 	}
 	// Request is to list payment intents
 	if ai2CPaymentInfo.ReturnRecordsLimit > ctv.VAL_ZERO {
-		tReply, errorInfo = processListPaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		tReply, errorInfo = processListPaymentIntent(ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService, ai2CPaymentInfo)
 		reply = tReply.Data
 		return
 	}
 	// Request is to list payment methods
 	if strings.ToLower(ai2CPaymentInfo.PaymentMethod) == ctv.PAYMENT_METHOD_LIST {
-		tReply, errorInfo = processListPaymentMethod(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		tReply, errorInfo = processListPaymentMethod(ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService, ai2CPaymentInfo)
 		reply = tReply.Data
 		return
 	}
 	// Request is to create a payment
 	if ai2CPaymentInfo.Amount > 0 && len(ai2CPaymentInfo.Currency) > ctv.VAL_ZERO {
-		tReply, errorInfo = processCreatePaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		tReply, errorInfo = processCreatePaymentIntent(ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService, ai2CPaymentInfo)
 		reply = tReply.Data
 		return
 	}
-	// Request is to confirm a payment
-	if ai2CPaymentInfo.Amount > 0 && len(ai2CPaymentInfo.Currency) > ctv.VAL_ZERO && len(ai2CPaymentInfo.PaymentIntentId) > ctv.VAL_ZERO {
-		tReply, errorInfo = processCreatePaymentIntent(ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
-		reply = tReply.Data
-		return
-	}
+	// // Request is to confirm a payment
+	// if ai2CPaymentInfo.Amount > 0 && len(ai2CPaymentInfo.Currency) > ctv.VAL_ZERO && len(ai2CPaymentInfo.PaymentIntentId) > ctv.VAL_ZERO {
+	// 	tReply, errorInfo = (ai2cClientPtr.clientId, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+	// 	reply = tReply.Data
+	// 	return
+	// }
 
 	return
 }
@@ -309,6 +326,7 @@ func (ai2cClientPtr *Ai2CClient) AI2PaymentRequest(ai2CPaymentInfo Ai2CPaymentIn
 //	Verifications: None
 func processAWSClientParameters(
 	awssPtr *awss.AWSSession,
+	idToken string,
 	environment string,
 	natsConfigPtr *ns.NATSConfiguration,
 ) (errorInfo pi.ErrorInfo) {
@@ -321,6 +339,7 @@ func processAWSClientParameters(
 
 	if tParametersOutput, errorInfo = awss.GetParameters(
 		awssPtr,
+		idToken,
 		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_TOKEN),
 		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_PORT),
 		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_URL),
@@ -366,7 +385,7 @@ func processAWSClientParameters(
 //	Errors: None
 //	Verifications: None
 func processCancelPaymentIntent(
-	clientId string,
+	clientId, secretKey string,
 	natsServicePtr *ns.NATSService,
 	ai2CPaymentInfo Ai2CPaymentInfo,
 ) (
@@ -375,13 +394,14 @@ func processCancelPaymentIntent(
 ) {
 
 	var (
-		tFunction, _, _, _ = runtime.Caller(0)
-		tFunctionName      = runtime.FuncForPC(tFunction).Name()
-		tKey               string
-		tNATSHeader        = make(map[string][]string)
-		tPIR               CancelPaymentIntentRequest
-		tRequestData       []byte
-		tRequestMsg        nats.Msg
+		tEncryptedRequestData string
+		tFunction, _, _, _    = runtime.Caller(0)
+		tFunctionName         = runtime.FuncForPC(tFunction).Name()
+		tKey                  string
+		tNATSHeader           = make(map[string][]string)
+		tPIR                  CancelPaymentIntentRequest
+		tRequestData          []byte
+		tRequestMsg           nats.Msg
 	)
 
 	if ai2CPaymentInfo.Keys.Public == ctv.VAL_EMPTY {
@@ -399,13 +419,16 @@ func processCancelPaymentIntent(
 		errorInfo = pi.NewErrorInfo(errorInfo.Error, fmt.Sprintf("%v%v - %v%v", ctv.TXT_FUNCTION_NAME, tFunctionName, ctv.TXT_SUBJECT, ctv.SUB_STRIPE_CANCEL_PAYMENT_INTENT))
 		return
 	}
+	if tEncryptedRequestData, errorInfo = jwts.Encrypt(clientId, secretKey, string(tRequestData)); errorInfo.Error != nil {
+		return
+	}
 
 	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
 
 	tRequestMsg = nats.Msg{
 		Subject: ctv.SUB_STRIPE_CANCEL_PAYMENT_INTENT,
 		Header:  tNATSHeader,
-		Data:    tRequestData,
+		Data:    []byte(tEncryptedRequestData),
 	}
 
 	reply, errorInfo = ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)
@@ -419,7 +442,7 @@ func processCancelPaymentIntent(
 // Errors: None
 // Verifications: None
 func processCreatePaymentIntent(
-	clientId string,
+	clientId, secretKey string,
 	natsServicePtr *ns.NATSService,
 	ai2CPaymentInfo Ai2CPaymentInfo,
 ) (
@@ -428,13 +451,14 @@ func processCreatePaymentIntent(
 ) {
 
 	var (
-		tFunction, _, _, _ = runtime.Caller(0)
-		tFunctionName      = runtime.FuncForPC(tFunction).Name()
-		tKey               string
-		tNATSHeader        = make(map[string][]string)
-		tPIR               PaymentIntentRequest
-		tRequestData       []byte
-		tRequestMsg        nats.Msg
+		tEncryptedRequestData string
+		tFunction, _, _, _    = runtime.Caller(0)
+		tFunctionName         = runtime.FuncForPC(tFunction).Name()
+		tKey                  string
+		tNATSHeader           = make(map[string][]string)
+		tPIR                  PaymentIntentRequest
+		tRequestData          []byte
+		tRequestMsg           nats.Msg
 	)
 
 	if ai2CPaymentInfo.Keys.Public == ctv.VAL_EMPTY {
@@ -457,13 +481,16 @@ func processCreatePaymentIntent(
 		errorInfo = pi.NewErrorInfo(errorInfo.Error, fmt.Sprintf("%v%v - %v%v", ctv.TXT_FUNCTION_NAME, tFunctionName, ctv.TXT_SUBJECT, ctv.SUB_STRIPE_CREATE_PAYMENT_INTENT))
 		return
 	}
+	if tEncryptedRequestData, errorInfo = jwts.Encrypt(clientId, secretKey, string(tRequestData)); errorInfo.Error != nil {
+		return
+	}
 
 	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
 
 	tRequestMsg = nats.Msg{
 		Subject: ctv.SUB_STRIPE_CREATE_PAYMENT_INTENT,
 		Header:  tNATSHeader,
-		Data:    tRequestData,
+		Data:    []byte(tEncryptedRequestData),
 	}
 
 	reply, errorInfo = ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)
@@ -478,7 +505,7 @@ func processCreatePaymentIntent(
 //	Errors: None
 //	Verifications: None
 func processListPaymentIntent(
-	clientId string,
+	clientId, secretKey string,
 	natsServicePtr *ns.NATSService,
 	ai2CPaymentInfo Ai2CPaymentInfo,
 ) (
@@ -487,13 +514,14 @@ func processListPaymentIntent(
 ) {
 
 	var (
-		tFunction, _, _, _ = runtime.Caller(0)
-		tFunctionName      = runtime.FuncForPC(tFunction).Name()
-		tKey               string
-		tNATSHeader        = make(map[string][]string)
-		tPIR               ListPaymentIntentRequest
-		tRequestData       []byte
-		tRequestMsg        nats.Msg
+		tEncryptedRequestData string
+		tFunction, _, _, _    = runtime.Caller(0)
+		tFunctionName         = runtime.FuncForPC(tFunction).Name()
+		tKey                  string
+		tNATSHeader           = make(map[string][]string)
+		tPIR                  ListPaymentIntentRequest
+		tRequestData          []byte
+		tRequestMsg           nats.Msg
 	)
 
 	if ai2CPaymentInfo.Keys.Public == ctv.VAL_EMPTY {
@@ -512,13 +540,16 @@ func processListPaymentIntent(
 		errorInfo = pi.NewErrorInfo(errorInfo.Error, fmt.Sprintf("%v%v - %v%v", ctv.TXT_FUNCTION_NAME, tFunctionName, ctv.TXT_SUBJECT, ctv.SUB_STRIPE_LIST_PAYMENT_INTENTS))
 		return
 	}
+	if tEncryptedRequestData, errorInfo = jwts.Encrypt(clientId, secretKey, string(tRequestData)); errorInfo.Error != nil {
+		return
+	}
 
 	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
 
 	tRequestMsg = nats.Msg{
 		Subject: ctv.SUB_STRIPE_LIST_PAYMENT_INTENTS,
 		Header:  tNATSHeader,
-		Data:    tRequestData,
+		Data:    []byte(tEncryptedRequestData),
 	}
 
 	reply, errorInfo = ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)
@@ -533,7 +564,7 @@ func processListPaymentIntent(
 //	Errors: None
 //	Verifications: None
 func processListPaymentMethod(
-	clientId string,
+	clientId, secretKey string,
 	natsServicePtr *ns.NATSService,
 	ai2CPaymentInfo Ai2CPaymentInfo,
 ) (
@@ -542,13 +573,14 @@ func processListPaymentMethod(
 ) {
 
 	var (
-		tFunction, _, _, _ = runtime.Caller(0)
-		tFunctionName      = runtime.FuncForPC(tFunction).Name()
-		tKey               string
-		tNATSHeader        = make(map[string][]string)
-		tPIR               ListPaymentMethodRequest
-		tRequestData       []byte
-		tRequestMsg        nats.Msg
+		tEncryptedRequestData string
+		tFunction, _, _, _    = runtime.Caller(0)
+		tFunctionName         = runtime.FuncForPC(tFunction).Name()
+		tKey                  string
+		tNATSHeader           = make(map[string][]string)
+		tPIR                  ListPaymentMethodRequest
+		tRequestData          []byte
+		tRequestMsg           nats.Msg
 	)
 
 	if ai2CPaymentInfo.Keys.Public == ctv.VAL_EMPTY {
@@ -564,13 +596,16 @@ func processListPaymentMethod(
 		errorInfo = pi.NewErrorInfo(errorInfo.Error, fmt.Sprintf("%v%v - %v%v", ctv.TXT_FUNCTION_NAME, tFunctionName, ctv.TXT_SUBJECT, ctv.SUB_STRIPE_LIST_PAYMENT_METHODS))
 		return
 	}
+	if tEncryptedRequestData, errorInfo = jwts.Encrypt(clientId, secretKey, string(tRequestData)); errorInfo.Error != nil {
+		return
+	}
 
 	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
 
 	tRequestMsg = nats.Msg{
 		Subject: ctv.SUB_STRIPE_LIST_PAYMENT_METHODS,
 		Header:  tNATSHeader,
-		Data:    tRequestData,
+		Data:    []byte(tEncryptedRequestData),
 	}
 
 	reply, errorInfo = ns.RequestWithHeader(natsServicePtr.ConnPtr, natsServicePtr.InstanceName, &tRequestMsg, 2*time.Second)

@@ -183,6 +183,8 @@ github.com/sty-holdings/constant-type-vars-go/v2024 v2024.7.2 h1:ZuqXnmDS7PfYmpS
 github.com/sty-holdings/constant-type-vars-go/v2024 v2024.7.2/go.mod h1:+2gv9FAljEUY01zhDnycbUcgP6C/q14iMuByDCUnrRY=
 github.com/sty-holdings/constant-type-vars-go/v2024 v2024.7.3 h1:ZsmQvt6midlPTkim4ZFSO8wcT5R5e9U2dGZVdkq9BZ8=
 github.com/sty-holdings/constant-type-vars-go/v2024 v2024.7.3/go.mod h1:+2gv9FAljEUY01zhDnycbUcgP6C/q14iMuByDCUnrRY=
+github.com/sty-holdings/constant-type-vars-go/v2024 v2024.7.7 h1:Qtr1LukIdTLcuADlXP9vQv2ZIqxkhD9bdiNOr3igOzI=
+github.com/sty-holdings/constant-type-vars-go/v2024 v2024.7.7/go.mod h1:+2gv9FAljEUY01zhDnycbUcgP6C/q14iMuByDCUnrRY=
 github.com/sty-holdings/sty-shared/v2024 v2024.8.0 h1:zioOphxavTGvaYPk+sWcWv2Y6ULqVO3LniET00RiPp8=
 github.com/sty-holdings/sty-shared/v2024 v2024.8.0/go.mod h1:ZABjmOrHYSL5Jaf2FQNm1OM5bKn0E0L6Ukact78nlDg=
 github.com/sty-holdings/sty-shared/v2024 v2024.8.1 h1:OCyyBgHCDRtXM8NKqweRe8jng4grrZfu1g7aUlsaUSg=
@@ -203,6 +205,8 @@ github.com/sty-holdings/sty-shared/v2024 v2024.11.1 h1:bCDRC7JiySjQsHlEIDlKLcPWc
 github.com/sty-holdings/sty-shared/v2024 v2024.11.1/go.mod h1:hR6GFdlMdEFeqcBED3vQSxE2qzvsaAFzpX+aYvL/NzI=
 github.com/sty-holdings/sty-shared/v2024 v2024.12.0 h1:5lq4L9q/nN7M+dvSbaeVGGFSmigJ3xLpatinFaxXSKk=
 github.com/sty-holdings/sty-shared/v2024 v2024.12.0/go.mod h1:hR6GFdlMdEFeqcBED3vQSxE2qzvsaAFzpX+aYvL/NzI=
+github.com/sty-holdings/sty-shared/v2024 v2024.13.0 h1:i4XkSngFLltDfotujLi3OYUO28qUvQM3eflDXRO4ROM=
+github.com/sty-holdings/sty-shared/v2024 v2024.13.0/go.mod h1:0dMmA42itMAiTQo5WIHV0H72Zy5kdDtxidWWGNE0xk8=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.opencensus.io v0.24.0 h1:y73uSU6J157QMP2kn2r30vwW1A2W2WFwSCGnAVxeaD0=
 go.opencensus.io v0.24.0/go.mod h1:vNK8G9p7aAivkbmorf4v+7Hgx+Zs0yY+0fOtgBfjQKo=
