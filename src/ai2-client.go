@@ -51,7 +51,7 @@ const (
 )
 
 type Ai2CClient struct {
-	awsSessionPtr      *awss.AWSSession
+	awsSettings        awss.AWSSettings
 	environment        string
 	natsService        ns.NATSService
 	natsConfig         ns.NATSConfiguration
@@ -187,19 +187,20 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 		return
 	}
 
-	if ai2cClientPtr.awsSessionPtr, errorInfo = awss.NewAWSConfig(tEnvironment); errorInfo.Error != nil {
+	if ai2cClientPtr.awsSettings, errorInfo = awss.LoadAWSCustomerSettings(tEnvironment); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
 	ai2cClientPtr.environment = tEnvironment
 	ai2cClientPtr.tempDirectory = tTempDirectory
 
+	// This returns information about the STYH Customer
 	if ai2cClientPtr.styhCustomerConfig.clientId,
 		ai2cClientPtr.styhCustomerConfig.tokens.Access,
 		ai2cClientPtr.styhCustomerConfig.tokens.ID,
 		ai2cClientPtr.styhCustomerConfig.tokens.Refresh, errorInfo = awss.Login(
 		ctv.AUTH_USER_SRP, tUsername, &tPassword,
-		ai2cClientPtr.awsSessionPtr,
+		ai2cClientPtr.awsSettings.STYHCognitoIdentityInfo, ai2cClientPtr.awsSettings.BaseConfig,
 	); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
@@ -211,7 +212,7 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 	tSecretKey = ctv.TXT_PROTECTED // Clear the secret key from memory.
 
 	if errorInfo = processAWSClientParameters(
-		ai2cClientPtr.awsSessionPtr,
+		ai2cClientPtr.awsSettings,
 		ai2cClientPtr.styhCustomerConfig.tokens.ID,
 		tEnvironment,
 		&ai2cClientPtr.natsConfig,
@@ -325,7 +326,7 @@ func (ai2cClientPtr *Ai2CClient) AI2PaymentRequest(ai2CPaymentInfo Ai2CPaymentIn
 //	Errors: None
 //	Verifications: None
 func processAWSClientParameters(
-	awssPtr *awss.AWSSession,
+	awsSettings awss.AWSSettings,
 	idToken string,
 	environment string,
 	natsConfigPtr *ns.NATSConfiguration,
@@ -338,7 +339,8 @@ func processAWSClientParameters(
 	)
 
 	if tParametersOutput, errorInfo = awss.GetParameters(
-		awssPtr,
+		awsSettings.STYHCognitoIdentityInfo,
+		awsSettings.BaseConfig,
 		idToken,
 		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_TOKEN),
 		ctv.GetParameterName(AI2C_SSM_PARAMETER_PREFIX, environment, ctv.PARAMETER_NATS_PORT),

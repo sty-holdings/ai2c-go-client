@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.49.2
 	github.com/integrii/flaggy v1.5.2
 	github.com/sty-holdings/constant-type-vars-go/v2024 v2024.7.7
-	github.com/sty-holdings/sty-shared/v2024 v2024.13.0
+	github.com/sty-holdings/sty-shared/v2024 v2024.13.13
 	golang.org/x/text v0.14.0
 )
 
