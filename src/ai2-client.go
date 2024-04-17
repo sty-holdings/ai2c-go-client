@@ -288,7 +288,7 @@ func (ai2cClientPtr *Ai2CClient) AI2PaymentRequest(ai2CPaymentInfo Ai2CPaymentIn
 	// Request is a cancellation
 	if len(ai2CPaymentInfo.CancellationReason) > ctv.VAL_ZERO && len(ai2CPaymentInfo.PaymentIntentId) > ctv.VAL_ZERO {
 		tReply, errorInfo = processCancelPaymentIntent(
-			ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService,
+			ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, ai2cClientPtr.styhCustomerConfig.username, &ai2cClientPtr.natsService,
 			ai2CPaymentInfo,
 		)
 		reply = tReply.Data
@@ -305,13 +305,25 @@ func (ai2cClientPtr *Ai2CClient) AI2PaymentRequest(ai2CPaymentInfo Ai2CPaymentIn
 	}
 	// Request is to list payment methods
 	if strings.ToLower(ai2CPaymentInfo.PaymentMethod) == ctv.PAYMENT_METHOD_LIST {
-		tReply, errorInfo = processListPaymentMethod(ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		tReply, errorInfo = processListPaymentMethod(
+			ai2cClientPtr.styhCustomerConfig.clientId,
+			ai2cClientPtr.secretKey,
+			ai2cClientPtr.styhCustomerConfig.username,
+			&ai2cClientPtr.natsService,
+			ai2CPaymentInfo,
+		)
 		reply = tReply.Data
 		return
 	}
 	// Request is to create a payment
 	if ai2CPaymentInfo.Amount > 0 && len(ai2CPaymentInfo.Currency) > ctv.VAL_ZERO {
-		tReply, errorInfo = processCreatePaymentIntent(ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		tReply, errorInfo = processCreatePaymentIntent(
+			ai2cClientPtr.styhCustomerConfig.clientId,
+			ai2cClientPtr.secretKey,
+			ai2cClientPtr.styhCustomerConfig.username,
+			&ai2cClientPtr.natsService,
+			ai2CPaymentInfo,
+		)
 		reply = tReply.Data
 		return
 	}
@@ -394,7 +406,7 @@ func processAWSClientParameters(
 //	Errors: None
 //	Verifications: None
 func processCancelPaymentIntent(
-	clientId, secretKey string,
+	clientId, secretKey, username string,
 	natsServicePtr *ns.NATSService,
 	ai2CPaymentInfo Ai2CPaymentInfo,
 ) (
@@ -432,7 +444,8 @@ func processCancelPaymentIntent(
 		return
 	}
 
-	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
+	tNATSHeader[ctv.FN_STYH_CLIENT_ID] = []string{clientId}
+	tNATSHeader[ctv.FN_USERNAME] = []string{username}
 
 	tRequestMsg = nats.Msg{
 		Subject: ctv.SUB_STRIPE_CANCEL_PAYMENT_INTENT,
@@ -451,7 +464,7 @@ func processCancelPaymentIntent(
 // Errors: None
 // Verifications: None
 func processCreatePaymentIntent(
-	clientId, secretKey string,
+	clientId, secretKey, username string,
 	natsServicePtr *ns.NATSService,
 	ai2CPaymentInfo Ai2CPaymentInfo,
 ) (
@@ -494,7 +507,8 @@ func processCreatePaymentIntent(
 		return
 	}
 
-	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
+	tNATSHeader[ctv.FN_STYH_CLIENT_ID] = []string{clientId}
+	tNATSHeader[ctv.FN_USERNAME] = []string{username}
 
 	tRequestMsg = nats.Msg{
 		Subject: ctv.SUB_STRIPE_CREATE_PAYMENT_INTENT,
@@ -553,7 +567,7 @@ func processListPaymentIntent(
 		return
 	}
 
-	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
+	tNATSHeader[ctv.FN_STYH_CLIENT_ID] = []string{clientId}
 	tNATSHeader[ctv.FN_USERNAME] = []string{username}
 
 	tRequestMsg = nats.Msg{
@@ -574,7 +588,7 @@ func processListPaymentIntent(
 //	Errors: None
 //	Verifications: None
 func processListPaymentMethod(
-	clientId, secretKey string,
+	clientId, secretKey, username string,
 	natsServicePtr *ns.NATSService,
 	ai2CPaymentInfo Ai2CPaymentInfo,
 ) (
@@ -610,7 +624,8 @@ func processListPaymentMethod(
 		return
 	}
 
-	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
+	tNATSHeader[ctv.FN_STYH_CLIENT_ID] = []string{clientId}
+	tNATSHeader[ctv.FN_USERNAME] = []string{username}
 
 	tRequestMsg = nats.Msg{
 		Subject: ctv.SUB_STRIPE_LIST_PAYMENT_METHODS,
