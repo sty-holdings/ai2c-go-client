@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	clientId       string
+	styhClientId   string
 	configFileFQN  string
 	generateConfig bool
 	password       string
@@ -77,7 +77,7 @@ func init() {
 	// Add a flag to the main program (this will be available in all subcommands as well).
 	flaggy.String(&configFileFQN, "c", "config", "Provides the setup information needed by and is required to start the program.")
 	flaggy.Bool(&generateConfig, "gc", "genconfig", "This will output a skeleton configuration and note files.\n\t\t\tThis will cause all other options to be ignored.")
-	flaggy.String(&clientId, "ci", "clientId", "The AI2 Connect assigned client id. You can find it here: https://production-nc-dashboard.web.app/.")
+	flaggy.String(&styhClientId, "ci", "clientId", "The AI2 Connect assigned client id. You can find it here: https://production-nc-dashboard.web.app/.")
 	flaggy.String(&password, "p", "password", "The password you selected when you signed up for AI2 connect services. This is encrypted using SSL and only exist in Cognito.")
 	flaggy.String(
 		&secretKey, "sk", "secretKey", "The AI2 Connect assigned secret key. This is encrypted using SSL and a new can be generated at https://production-nc-dashboard."+
@@ -116,7 +116,7 @@ func main() {
 			pi.PrintError(pi.ErrVersionInvalid, fmt.Sprintf("%v %v", ctv.TXT_SERVER_VERSION, version))
 			flaggy.ShowHelpAndExit("")
 		}
-		if username == ctv.VAL_EMPTY || password == ctv.VAL_EMPTY || clientId == ctv.VAL_EMPTY || secretKey == ctv.VAL_EMPTY || tempDirectory == ctv.VAL_EMPTY {
+		if username == ctv.VAL_EMPTY || password == ctv.VAL_EMPTY || styhClientId == ctv.VAL_EMPTY || secretKey == ctv.VAL_EMPTY || tempDirectory == ctv.VAL_EMPTY {
 			// Has the config file location and name been provided, if not, return help.
 			if configFileFQN == "" || configFileFQN == "-t" {
 				flaggy.ShowHelpAndExit("")
@@ -124,12 +124,12 @@ func main() {
 		}
 	}
 
-	run(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN)
+	run(styhClientId, environment, password, secretKey, tempDirectory, username, configFileFQN)
 
 	os.Exit(0)
 }
 
-func run(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) {
+func run(styhClientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) {
 
 	var (
 		clientPtr               src.Ai2CClient
@@ -142,7 +142,7 @@ func run(clientId, environment, password, secretKey, tempDirectory, username, co
 	// The following is all the code the developer needs to use Ai2Connect.io
 
 	// Connect to the Ai2Connect service.
-	if clientPtr, errorInfo = src.NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
+	if clientPtr, errorInfo = src.NewAI2CClient(styhClientId, environment, password, secretKey, tempDirectory, username, configFileFQN); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		flaggy.ShowHelpAndExit("")
 	}

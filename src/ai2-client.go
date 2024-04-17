@@ -118,16 +118,16 @@ type styhCustomerConfig struct {
 	username  string
 }
 
-func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) (
+func NewAI2CClient(styhClientId, environment, password, secretKey, tempDirectory, username, configFileFQN string) (
 	ai2cClientPtr Ai2CClient,
 	errorInfo pi.ErrorInfo,
 ) {
 
 	var (
-		tClientId      string
 		tEnvironment   string
 		tPassword      string
 		tSecretKey     string
+		tSTYHClientId  string
 		tTempDirectory string
 		tUsername      string
 	)
@@ -137,11 +137,11 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 	)
 
 	if configFileFQN == ctv.VAL_EMPTY {
-		if clientId == ctv.VAL_EMPTY {
+		if styhClientId == ctv.VAL_EMPTY {
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_CLIENT_ID))
 			return
 		} else {
-			tClientId = clientId
+			tSTYHClientId = styhClientId
 		}
 		if password == ctv.VAL_EMPTY {
 			errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_PASSWORD))
@@ -173,7 +173,7 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 		if tConfigMap, errorInfo = cfgs.GetConfigFile(configFileFQN); errorInfo.Error != nil {
 			return
 		}
-		tClientId = tConfigMap[ctv.FN_CLIENT_ID].(string)
+		tSTYHClientId = tConfigMap[ctv.FN_STYH_CLIENT_ID].(string)
 		tEnvironment = tConfigMap[ctv.FN_ENVIRONMENT].(string)
 		tPassword = tConfigMap[ctv.FN_PASSWORD].(string)
 		tConfigMap[ctv.FN_PASSWORD] = ctv.TXT_PROTECTED // Clear the password from memory.
@@ -182,7 +182,7 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 		tUsername = tConfigMap[ctv.FN_USERNAME].(string)
 	}
 
-	if errorInfo = validateConfiguration(tClientId, tEnvironment, tSecretKey, tTempDirectory, tUsername, &tPassword); errorInfo.Error != nil {
+	if errorInfo = validateConfiguration(tSTYHClientId, tEnvironment, tSecretKey, tTempDirectory, tUsername, &tPassword); errorInfo.Error != nil {
 		pi.PrintErrorInfo(errorInfo)
 		return
 	}
@@ -195,8 +195,7 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 	ai2cClientPtr.tempDirectory = tTempDirectory
 
 	// This returns information about the STYH Customer
-	if ai2cClientPtr.styhCustomerConfig.clientId,
-		ai2cClientPtr.styhCustomerConfig.tokens.Access,
+	if ai2cClientPtr.styhCustomerConfig.tokens.Access,
 		ai2cClientPtr.styhCustomerConfig.tokens.ID,
 		ai2cClientPtr.styhCustomerConfig.tokens.Refresh, errorInfo = awss.Login(
 		ctv.AUTH_USER_SRP, tUsername, &tPassword,
@@ -206,6 +205,8 @@ func NewAI2CClient(clientId, environment, password, secretKey, tempDirectory, us
 		return
 	}
 
+	ai2cClientPtr.styhCustomerConfig.clientId = tSTYHClientId
+	ai2cClientPtr.styhCustomerConfig.username = tUsername
 	ai2cClientPtr.secretKey = tSecretKey
 	tPassword = ctv.TXT_PROTECTED  // Clear the password from memory.
 	secretKey = ctv.TXT_PROTECTED  // Clear the secret key from memory.
@@ -286,13 +287,19 @@ func (ai2cClientPtr *Ai2CClient) AI2PaymentRequest(ai2CPaymentInfo Ai2CPaymentIn
 	//
 	// Request is a cancellation
 	if len(ai2CPaymentInfo.CancellationReason) > ctv.VAL_ZERO && len(ai2CPaymentInfo.PaymentIntentId) > ctv.VAL_ZERO {
-		tReply, errorInfo = processCancelPaymentIntent(ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		tReply, errorInfo = processCancelPaymentIntent(
+			ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService,
+			ai2CPaymentInfo,
+		)
 		reply = tReply.Data
 		return
 	}
 	// Request is to list payment intents
 	if ai2CPaymentInfo.ReturnRecordsLimit > ctv.VAL_ZERO {
-		tReply, errorInfo = processListPaymentIntent(ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, &ai2cClientPtr.natsService, ai2CPaymentInfo)
+		tReply, errorInfo = processListPaymentIntent(
+			ai2cClientPtr.styhCustomerConfig.clientId, ai2cClientPtr.secretKey, ai2cClientPtr.styhCustomerConfig.username,
+			&ai2cClientPtr.natsService, ai2CPaymentInfo,
+		)
 		reply = tReply.Data
 		return
 	}
@@ -507,7 +514,7 @@ func processCreatePaymentIntent(
 //	Errors: None
 //	Verifications: None
 func processListPaymentIntent(
-	clientId, secretKey string,
+	clientId, secretKey, username string,
 	natsServicePtr *ns.NATSService,
 	ai2CPaymentInfo Ai2CPaymentInfo,
 ) (
@@ -547,6 +554,7 @@ func processListPaymentIntent(
 	}
 
 	tNATSHeader[ctv.FN_CLIENT_ID] = []string{clientId}
+	tNATSHeader[ctv.FN_USERNAME] = []string{username}
 
 	tRequestMsg = nats.Msg{
 		Subject: ctv.SUB_STRIPE_LIST_PAYMENT_INTENTS,
@@ -622,14 +630,14 @@ func processListPaymentMethod(
 //	Errors: ErrEnvironmentInvalid, ErrRequiredArgumentMissing
 //	Verifications: None
 func validateConfiguration(
-	clientId, environment, secretKey, tempDirectory, username string,
+	styhClientId, environment, secretKey, tempDirectory, username string,
 	passwordPtr *string,
 ) (
 	errorInfo pi.ErrorInfo,
 ) {
 
-	if clientId == ctv.VAL_EMPTY {
-		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_CLIENT_ID))
+	if styhClientId == ctv.VAL_EMPTY {
+		errorInfo = pi.NewErrorInfo(pi.ErrRequiredArgumentMissing, fmt.Sprintf("%v%v", ctv.TXT_MISSING_PARAMETER, ctv.FN_STYH_CLIENT_ID))
 		return
 	}
 	if hv.IsEnvironmentValid(environment) == false {
